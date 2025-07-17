@@ -1238,21 +1238,15 @@ export function activate(context: vscode.ExtensionContext) {
 			
 			const diagnostics: vscode.Diagnostic[] = issues
 				.filter((issue: SecurityIssue) => {
-					// Exclude best-practice issues from diagnostics to remove underlines
+					// Exclude best-practice and complexity issues from diagnostics to remove underlines
 					// They will still be visible in CodeLens and hover
-					return issue.type !== 'best-practice';
+					return issue.type !== 'best-practice' && issue.type !== 'complexity';
 				})
 				.map((issue: SecurityIssue) => {
-					// For complexity issues, use Information severity to avoid red tab decoration
-					let diagnosticSeverity = issue.severity;
-					if (issue.type === 'complexity') {
-						diagnosticSeverity = vscode.DiagnosticSeverity.Information;
-					}
-					
 					const diagnostic = new vscode.Diagnostic(
 						issue.range,
 						issue.message,
-						diagnosticSeverity
+						issue.severity
 					);
 					diagnostic.source = issue.source;
 					diagnostic.code = issue.type;
