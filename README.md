@@ -1,28 +1,31 @@
-# Code Security Analyzer
+# Code Security Analyzer with AI Fix Suggestions
 
-A comprehensive VS Code extension that analyzes code for security vulnerabilities, errors, and best practices violations using both pattern-based detection and AI-powered analysis.
+A comprehensive VS Code extension that analyzes code for security vulnerabilities and provides AI-powered fix suggestions similar to GitHub Copilot.
 
 ## Features
 
-🔍 **Real-time Security Analysis**
-- Automatic vulnerability detection as you type
-- Support for 10+ programming languages
-- Pattern-based and AI-powered analysis
+### 🔍 Security Analysis
+- **Real-time vulnerability detection** for multiple programming languages
+- **Complexity analysis** with detailed metrics
+- **Best practices checking** to improve code quality
+- **Code lens integration** showing issues directly in the editor
+- **Hover information** with detailed explanations
 
-🎯 **Inline Visual Feedback** 
-- CodeLens indicators showing security issues directly in code
-- Confidence ratings with color-coded indicators
-- Hover tooltips with detailed explanations
+### 🤖 AI-Powered Fix Suggestions
+- **Intelligent fix generation** using advanced AI models
+- **Context-aware solutions** that understand your codebase
+- **Confidence scoring** for each suggested fix
+- **Step-by-step implementation** guidance
+- **One-click fix application** with safety confirmations
 
-🤖 **AI-Enhanced Detection**
-- OpenAI GPT-4 integration for sophisticated analysis
-- Language-specific security best practices
-- Actionable remediation suggestions
-
-📊 **Comprehensive Reporting**
-- Detailed webview panels for each security issue
-- CVE references and security standards compliance
-- Confidence scoring and risk assessment
+### 🛡️ Security Coverage
+- SQL Injection detection and prevention
+- Cross-Site Scripting (XSS) vulnerabilities
+- Hardcoded credentials and secrets
+- Insecure cryptographic practices
+- Command injection vulnerabilities
+- Path traversal issues
+- And many more...
 
 ## Supported Languages
 
@@ -54,34 +57,46 @@ A comprehensive VS Code extension that analyzes code for security vulnerabilitie
 - **Unsafe Deserialization** - Safe parsing methods
 - **Open Redirects** - URL validation techniques
 
-## Installation & Setup
+## How It Works
 
-1. **Install the Extension** (when published to VS Code Marketplace)
-   ```
-   ext install code-security-analyzer
-   ```
+### 1. Automatic Analysis
+The extension continuously analyzes your code in the background, detecting:
+- **Vulnerabilities** (🚨 High priority security issues)
+- **Complexity issues** (📊 Code maintainability problems)
+- **Best practice violations** (💡 Code quality improvements)
 
-2. **Configure OpenAI API Key** (Optional but recommended)
-   - Open Command Palette (`Ctrl+Shift+P`)
-   - Run: `Code Security Analyzer: Configure OpenAI API Key`
-   - Enter your OpenAI API key for enhanced AI analysis
+### 2. AI Fix Suggestions
+When you hover over a security issue, the extension:
+- Shows detailed information about the vulnerability
+- Provides an AI-generated fix suggestion
+- Displays confidence levels and risk assessments
+- Offers step-by-step implementation guidance
 
-3. **Start Using**
-   - Open any supported code file
-   - Extension automatically activates and analyzes code
-   - View issues through CodeLens indicators and hover tooltips
+### 3. One-Click Fixes
+Through code actions or the hover UI, you can:
+- **Get AI Fix** - Generate a secure solution for the issue
+- **Apply Fix** - Automatically replace vulnerable code with secure alternatives
+- **Review Changes** - See before/after code comparisons
 
 ## Usage
 
-### Automatic Analysis
-- Extension analyzes code automatically when files are opened or changed
-- Issues appear as inline CodeLens indicators
-- Hover over highlighted code for detailed information
+### Setup
+1. Install the extension
+2. Configure your OpenRouter API key:
+   - Open Command Palette (`Ctrl+Shift+P`)
+   - Run "Configure OpenAI API Key"
+   - Enter your API key
 
-### Manual Analysis
-- Right-click in editor → "Analyze Active File for Security Issues"
-- Command Palette: `Code Security Analyzer: Analyze Active File`
-- Uses `Ctrl+Shift+P` → search for "security"
+### Getting Fix Suggestions
+1. **Hover over issues** - See AI fix suggestions in tooltips
+2. **Use code actions** - Right-click on issues for quick fixes
+3. **Command palette** - Search for "Get AI Fix" commands
+
+### Applying Fixes
+1. Review the suggested fix in the detailed UI
+2. Check the confidence level and risk assessment
+3. Click "Apply Fix" to replace the vulnerable code
+4. The extension will re-analyze to confirm the fix
 
 ### Configuration Options
 
@@ -93,37 +108,39 @@ A comprehensive VS Code extension that analyzes code for security vulnerabilitie
 }
 ```
 
-## Example Detections
+## Example: SQL Injection Fix
 
-### SQL Injection
+**Original vulnerable code:**
 ```javascript
-// ❌ Vulnerable
 const query = `SELECT * FROM users WHERE id = ${userId}`;
+```
 
-// ✅ Secure Alternative
+**AI-generated secure fix:**
+```javascript
 const query = 'SELECT * FROM users WHERE id = ?';
-db.execute(query, [userId]);
+const result = database.execute(query, [userId]);
 ```
 
-### XSS Prevention
-```javascript
-// ❌ Vulnerable
-element.innerHTML = userInput;
+## Configuration
 
-// ✅ Secure Alternative
-element.textContent = userInput;
-// or
-element.innerHTML = DOMPurify.sanitize(userInput);
-```
+### Settings
+- `codeSecurityAnalyzer.apiKey` - Your OpenRouter API key
+- `codeSecurityAnalyzer.enableAIAnalysis` - Enable/disable AI features
+- `codeSecurityAnalyzer.maxFileSize` - Maximum file size for AI analysis
+- `codeSecurityAnalyzer.analysisDelay` - Delay before triggering analysis
 
-### Hardcoded Credentials
-```javascript
-// ❌ Vulnerable
-const apiKey = "sk-1234567890abcdef";
+### Commands
+- `🔍 Analyze Active File` - Run full security analysis
+- `📊 Show Complexity Report` - View detailed complexity metrics
+- `🤖 Get AI Fix Suggestion` - Generate AI fix for selected issue
+- `🚀 Apply AI Fix` - Apply suggested security fix
+- `⚙️ Configure OpenAI API Key` - Set up API access
 
-// ✅ Secure Alternative
-const apiKey = process.env.API_KEY;
-```
+## Privacy & Security
+- Code is sent to OpenRouter/AI service only for fix generation
+- No code is stored or logged by the extension
+- All communication is encrypted (HTTPS)
+- You maintain full control over which fixes to apply
 
 ## Requirements
 

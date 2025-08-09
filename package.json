@@ -41,6 +41,16 @@
         "command": "codeSecurityAnalyzer.configureApiKey",
         "title": "⚙️ Configure OpenAI API Key",
         "category": "Code Security Analyzer"
+      },
+      {
+        "command": "codeSecurityAnalyzer.getAIFix",
+        "title": "🤖 Get AI Fix Suggestion",
+        "category": "Code Security Analyzer"
+      },
+      {
+        "command": "codeSecurityAnalyzer.applyAIFix",
+        "title": "🚀 Apply AI Fix",
+        "category": "Code Security Analyzer"
       }
     ],
     "configuration": {
@@ -86,6 +96,12 @@
         },
         {
           "command": "codeSecurityAnalyzer.configureApiKey"
+        },
+        {
+          "command": "codeSecurityAnalyzer.getAIFix"
+        },
+        {
+          "command": "codeSecurityAnalyzer.applyAIFix"
         }
       ]
     }

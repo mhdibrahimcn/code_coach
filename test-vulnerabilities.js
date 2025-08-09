@@ -13,8 +13,14 @@ document.getElementById('comments').innerHTML = userComment;
 const apiKey = "sk-1234567890bcdef1234567890abcdef";
 
 // Unsafe eval usage
+
+// Validate and sanitize user input
 const userCode = req.body.code;
-eval(userCode);
+if (typeof userCode !== 'string') {
+  throw new Error('Invalid input: code must be a string');
+}
+// Use a sandboxed environment if code execution is absolutely required
+// Consider alternative approaches like function whitelistinguserCode);
 
 // Insecure HTTP endpoint
 fetch('http://api.example.com/data');
@@ -27,7 +33,7 @@ const hash = crypto.createHash('md5').update(password).digest('hex');
 const sessionId = Math.random().toString(36);
 
 // Command injection
-const filename = req.query.file;
+const filename = require('path').basename(req.query.file);
 exec(`cat ${filename}`, callback);
 
 // Path traversal
