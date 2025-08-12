@@ -100,17 +100,17 @@ export class AISecurityAnalyzer {
 		}
 	}
 
-	private static createAnalysisPrompt(code: string, language: string): string {
+    private static createAnalysisPrompt(code: string, language: string): string {
 		const languageSpecificFocus = this.getLanguageSpecificFocus(language);
 
-		return `You are an expert code security analyzer with deep knowledge of ${language} security patterns and best practices. Perform a comprehensive security analysis of the provided code.
+        return `You are a highly experienced (${'>= 10 years'}) secure coding expert and software architect for ${language}. Perform a comprehensive, production-grade review that covers exploitable vulnerabilities, risky patterns, best practices, correct usage highlights, and industry-standard architectural guidance for maintainable code.
 
 **ANALYSIS REQUIREMENTS:**
 Return ONLY valid JSON in this exact format (no markdown, no explanations):
 {
   "issues": [
 	{
-	  "type": "vulnerability|error|warning|complexity|best-practice",
+      "type": "vulnerability|error|warning|complexity|best-practice",
 	  "severity": "error|warning|info", 
 	  "message": "Brief, specific issue description",
 	  "description": "Detailed technical explanation of the security risk and potential impact",
@@ -124,12 +124,12 @@ Return ONLY valid JSON in this exact format (no markdown, no explanations):
 	  "functionName": "function name (optional, for function-specific issues)"
 	}
   ],
-  "summary": "Professional security assessment summary with risk level"
+  "summary": "Professional assessment: prioritized risks, key fixes, refactor and architectural guidance"
 }
 
 **SECURITY ANALYSIS FOCUS:**
 
-**Universal Security Issues:**
+**Universal Security Issues (prioritize exploitable findings):**
 1. SQL Injection (parameterized queries, ORM usage)
 2. Cross-Site Scripting (XSS) - reflected, stored, DOM-based
 3. Authentication bypasses and session management flaws
@@ -149,19 +149,23 @@ Return ONLY valid JSON in this exact format (no markdown, no explanations):
 17. Insecure direct object references
 18. Security misconfigurations
 
-**CODE COMPLEXITY & BEST PRACTICES:**
+**CODE QUALITY, BEST PRACTICES, AND ARCHITECTURE:**
 - Function complexity (cyclomatic, cognitive)
 - Function length and parameter count
-- Nesting levels and code readability
-- Magic numbers and hardcoded values
-- Error handling patterns
-- Code duplication
-- Naming conventions
+- Nesting/readability; SRP and cohesion
+- Hardcoded values and configuration management
+- Error handling patterns and logging hygiene
+- Code duplication and DRY
+- Naming conventions and code clarity
 - Comment quality and TODO items
 - Resource management (memory leaks, file handles)
-- Performance anti-patterns that could lead to DoS
-- Threading and concurrency safety
-- API design security (rate limiting, validation)
+- Performance anti-patterns (e.g., ReDoS, N+1 queries)
+- API design and validation (rate limiting, input schemas)
+- Architecture suggestions (layering, dependency injection, separation of concerns, module boundaries)
+
+Also include:
+- "best-practice" type issues for maintainability and architectural improvements
+- "best-practice" type informational items highlighting clearly correct/secure usage (message should start with "Good practice:")
 
 ${languageSpecificFocus}
 
@@ -172,6 +176,7 @@ ${languageSpecificFocus}
 - Mention relevant security standards (OWASP, CWE)
 - Suggest automated tools for detection
 - Include testing recommendations
+ - Where appropriate, include brief refactor guidance (function extraction, layering) without changing behavior
 
 Code to analyze:
 \`\`\`${language}
