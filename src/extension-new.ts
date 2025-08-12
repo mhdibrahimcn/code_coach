@@ -8,48 +8,7 @@ import { HybridAnalyzer } from './analyzers/HybridAnalyzer';
 import { AIProviderManager } from './core/AIProviderManager';
 import { SmartAIAnalyzer } from './analyzers/SmartAIAnalyzer';
 import { SettingsWebviewProvider } from './ui/SettingsWebviewProvider';
-export interface AIFixSuggestion {
-    originalCode: string;
-    fixedCode: string;
-    explanation: string;
-    confidence: number;
-    riskLevel: 'low' | 'medium' | 'high';
-    steps: string[];
-}
-
-export interface ComplexityMetrics {
-    cyclomaticComplexity: number;
-    cognitiveComplexity: number;
-    linesOfCode: number;
-    parameterCount: number;
-    nestingLevel: number;
-}
-
-export interface FunctionInfo {
-    name: string;
-    range: vscode.Range;
-    parameters: string[];
-    complexity: ComplexityMetrics;
-    bodyRange: vscode.Range;
-}
-
-export interface AIAnalysisResult {
-    issues: Array<{
-        type: 'vulnerability' | 'error' | 'warning' | 'complexity' | 'best-practice';
-        severity: 'error' | 'warning' | 'info';
-        message: string;
-        description: string;
-        suggestion: string;
-        lineNumber: number;
-        columnStart: number;
-        columnEnd: number;
-        confidence: number;
-        cveReference?: string;
-        complexityScore?: number;
-        functionName?: string;
-    }>;
-    summary: string;
-}
+import { AIFixSuggestion } from './extension';
 
 export interface AnalysisContext {
     document: vscode.TextDocument;

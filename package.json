@@ -38,8 +38,13 @@
         "category": "Code Security Analyzer"
       },
       {
+        "command": "codeSecurityAnalyzer.openSettings",
+        "title": "⚙️ Open Settings Panel",
+        "category": "Code Security Analyzer"
+      },
+      {
         "command": "codeSecurityAnalyzer.configureApiKey",
-        "title": "⚙️ Configure OpenAI API Key",
+        "title": "🔑 Configure AI Provider & API Key",
         "category": "Code Security Analyzer"
       },
       {
@@ -51,31 +56,127 @@
         "command": "codeSecurityAnalyzer.applyAIFix",
         "title": "🚀 Apply AI Fix",
         "category": "Code Security Analyzer"
+      },
+      {
+        "command": "codeSecurityAnalyzer.switchAiProvider",
+        "title": "🔄 Switch AI Provider",
+        "category": "Code Security Analyzer"
+      },
+      {
+        "command": "codeSecurityAnalyzer.toggleOfflineMode",
+        "title": "📡 Toggle Offline/Online Mode",
+        "category": "Code Security Analyzer"
       }
     ],
     "configuration": {
       "title": "Code Security Analyzer",
       "properties": {
-        "codeSecurityAnalyzer.apiKey": {
+        "codeSecurityAnalyzer.aiProvider": {
+          "type": "string",
+          "enum": ["openai", "anthropic", "openrouter", "ollama", "custom"],
+          "default": "openrouter",
+          "description": "AI provider for security analysis",
+          "enumDescriptions": [
+            "OpenAI GPT models (official API)",
+            "Anthropic Claude models (official API)",
+            "OpenRouter (multiple models via proxy)",
+            "Ollama (local models)",
+            "Custom OpenAI-compatible endpoint"
+          ]
+        },
+        "codeSecurityAnalyzer.aiModel": {
+          "type": "string",
+          "default": "openai/gpt-4o-mini",
+          "description": "AI model to use for analysis. Format depends on provider (e.g., 'gpt-4o-mini' for OpenAI, 'openai/gpt-4o-mini' for OpenRouter)"
+        },
+        "codeSecurityAnalyzer.apiKeys": {
+          "type": "object",
+          "default": {},
+          "description": "Stored API keys for different providers",
+          "scope": "application"
+        },
+        "codeSecurityAnalyzer.customEndpoint": {
           "type": "string",
           "default": "",
-          "description": "OpenAI API key for enhanced AI-powered security analysis",
-          "scope": "application"
+          "description": "Custom API endpoint URL (required for custom provider)",
+          "format": "uri",
+          "pattern": "^https?://.*"
+        },
+        "codeSecurityAnalyzer.customModel": {
+          "type": "string",
+          "default": "",
+          "description": "Custom model name for custom endpoints (e.g., 'gpt-4', 'claude-3-sonnet')"
+        },
+        "codeSecurityAnalyzer.temperature": {
+          "type": "number",
+          "default": 0.1,
+          "minimum": 0,
+          "maximum": 2,
+          "description": "AI model temperature (0 = deterministic, 2 = very creative)"
+        },
+        "codeSecurityAnalyzer.maxTokens": {
+          "type": "number",
+          "default": 1500,
+          "minimum": 100,
+          "maximum": 8000,
+          "description": "Maximum tokens for AI responses"
+        },
+        "codeSecurityAnalyzer.requestTimeout": {
+          "type": "number",
+          "default": 30000,
+          "minimum": 5000,
+          "maximum": 120000,
+          "description": "Request timeout in milliseconds"
         },
         "codeSecurityAnalyzer.enableAIAnalysis": {
           "type": "boolean",
           "default": true,
           "description": "Enable AI-powered security analysis (requires API key)"
         },
+        "codeSecurityAnalyzer.enableOfflineAnalysis": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable offline regex-based vulnerability detection"
+        },
+        "codeSecurityAnalyzer.hybridMode": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use hybrid offline+AI analysis for optimal accuracy and performance"
+        },
         "codeSecurityAnalyzer.maxFileSize": {
           "type": "number",
-          "default": 8000,
+          "default": 10000,
           "description": "Maximum file size (in characters) for AI analysis"
+        },
+        "codeSecurityAnalyzer.chunkSize": {
+          "type": "number",
+          "default": 3000,
+          "description": "Chunk size for processing large files (in characters)"
         },
         "codeSecurityAnalyzer.analysisDelay": {
           "type": "number",
           "default": 2000,
           "description": "Delay (in milliseconds) before triggering analysis after text changes"
+        },
+        "codeSecurityAnalyzer.enableBestPractices": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable best practice checks (console.log, empty catch, etc.)"
+        },
+        "codeSecurityAnalyzer.enableComplexityAnalysis": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable code complexity analysis"
+        },
+        "codeSecurityAnalyzer.showProviderInSuggestions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show AI provider and model name in suggestions"
+        },
+        "codeSecurityAnalyzer.debugMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable debug logging for troubleshooting AI provider issues"
         }
       }
     },
@@ -95,13 +196,41 @@
           "command": "codeSecurityAnalyzer.showComplexityReport"
         },
         {
+          "command": "codeSecurityAnalyzer.openSettings"
+        },
+        {
           "command": "codeSecurityAnalyzer.configureApiKey"
+        },
+        {
+          "command": "codeSecurityAnalyzer.switchAiProvider"
+        },
+        {
+          "command": "codeSecurityAnalyzer.toggleOfflineMode"
         },
         {
           "command": "codeSecurityAnalyzer.getAIFix"
         },
         {
           "command": "codeSecurityAnalyzer.applyAIFix"
+        }
+      ]
+    },
+    "views": {
+      "codeSecurityAnalyzer": [
+        {
+          "type": "webview",
+          "id": "codeSecurityAnalyzer.settingsView",
+          "name": "Settings",
+          "when": "true"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codeSecurityAnalyzer",
+          "title": "Code Security Analyzer",
+          "icon": "$(shield)"
         }
       ]
     }
