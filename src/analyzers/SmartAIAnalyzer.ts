@@ -187,7 +187,7 @@ export class SmartAIAnalyzer {
             'password', 'secret', 'api', 'key', 'token', 'auth', 'login',
             'sql', 'query', 'execute', 'select', 'insert', 'update', 'delete',
             'eval', 'exec', 'system', 'shell', 'command',
-            'innerHTML', 'outerHTML', 'document.write', 'dangerouslySetInnerHTML',
+            'innerhtml', 'outerhtml', 'document.write', 'dangerouslysetinnerhtml',
             'crypto', 'hash', 'encrypt', 'decrypt', 'random',
             'file', 'path', 'directory', 'upload', 'download'
         ];
@@ -261,37 +261,29 @@ export class SmartAIAnalyzer {
         
         let prompt = `Analyze this ${language} code for security vulnerabilities and provide a JSON response with the following structure:
 
-{
-  "issues": [
-    {
-      "type": "vulnerability|error|warning",
-      "severity": "error|warning|info",
-      "message": "Brief description",
-      "description": "Detailed explanation",
-      "suggestion": "How to fix this issue",
-      "lineNumber": number,
-      "columnStart": number,
-      "columnEnd": number,
-      "confidence": number (0-100),
-      "cveReference": "CWE-XXX (optional)",
-      "category": "xss|sql-injection|command-injection|crypto|auth|other"
-    }
-  ],
-  "summary": "Overall analysis summary",
-  "analyzedBy": "${providerInfo}"
-}
+        {
+          "issues": [
+        {
+          "type": "vulnerability|error|warning",
+          "severity": "error|warning|info",
+          "message": "Brief description",
+          "description": "Detailed explanation",
+          "suggestion": "How to fix this issue",
+          "lineNumber": number,
+          "columnStart": number,
+          "columnEnd": number,
+          "confidence": number (0-100),
+          "cveReference": "CWE-XXX (optional)",
+          "category": "xss|sql-injection|command-injection|crypto|auth|type-safety|best-practices|latest-vuln|other"
+        }
+          ],
+          "summary": "Overall analysis summary",
+          "analyzedBy": "${providerInfo}"
+        }
 
-Focus on:
-1. SQL injection vulnerabilities
-2. XSS (Cross-Site Scripting)
-3. Command injection
-4. Insecure cryptography
-5. Authentication/authorization issues
-6. Path traversal
-7. Deserialization vulnerabilities
-8. Code injection (eval, etc.)
+${this.getSecurityFocusChecklist()}
 
-`;
+        `;
 
         if (offlineIssues.length > 0) {
             prompt += `\nOffline analysis already found ${offlineIssues.length} issues. Please provide additional insights and validate these findings:\n`;
@@ -301,6 +293,9 @@ Focus on:
         }
 
         prompt += `\nCode to analyze:\n\`\`\`${language}\n${content}\n\`\`\``;
+        
+        // Also include instruction to provide the previous line above each issue (for UI context display)
+        prompt += `\n\nFor each issue, ensure the description begins with the exact previous line from the file in the form: "Line (N-1): <code>" followed by the detailed description.`;
 
         return prompt;
     }
@@ -331,6 +326,7 @@ Focus on:
 
 IMPORTANT: Line numbers should be relative to the original file (add ${startLine} to chunk-relative line numbers).
 
+${this.getSecurityFocusChecklist()}
 `;
 
         if (offlineIssues.length > 0) {
@@ -342,8 +338,39 @@ IMPORTANT: Line numbers should be relative to the original file (add ${startLine
         }
 
         prompt += `\nCode chunk:\n\`\`\`${language}\n${content}\n\`\`\``;
+        
+        // Require previous-line prefix for each issue in description
+        prompt += `\n\nFor each issue, start description with the previous source line in the format: "Line <absoluteLine-1>: <code>" then provide your explanation.`;
 
         return prompt;
+    }
+    private static getSecurityFocusChecklist(): string {
+        return `Focus on:
+    1. SQL injection vulnerabilities
+    2. XSS (Cross-Site Scripting)
+    3. Command injection
+    4. Insecure cryptography
+    5. Authentication/authorization issues
+    6. Path traversal
+    7. Deserialization vulnerabilities
+    8. Code injection (eval, Function, etc.)
+    9. Hardcoded credentials and secrets
+    10. Insufficient input validation and sanitization
+    11. Insecure file operations and permissions
+    12. Race conditions and concurrency issues
+    13. Memory safety vulnerabilities
+    14. Insecure random number generation
+    15. Information disclosure via logs/errors
+    16. Type confusion / unsafe casts
+    17. Language-specific best practices violations
+    18. Recent CVE patterns where applicable
+    19. Prototype pollution (JS/TS)
+    20. SSRF (Server-Side Request Forgery)
+    21. XXE (XML External Entity) injection
+    22. LDAP injection
+    23. NoSQL injection
+    24. Dependency confusion and supply chain risks
+    25. Language-specific security best practices and coding standards`;
     }
 
     private static parseAIResponse(response: any, document: vscode.TextDocument, lineOffset: number = 0): SecurityIssue[] {

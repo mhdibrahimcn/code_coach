@@ -4,11 +4,13 @@ import { LanguagePatterns, VulnerabilityPattern, BestPracticePattern } from '../
 
 export class OfflineAnalyzer {
     private static readonly CONFIDENCE_BOOST = {
-        'xss': 0.1,
-        'sql-injection': 0.15,
-        'command-injection': 0.15,
-        'crypto': 0.2,
-        'auth': 0.1
+        'xss': 0.14,
+        'sql-injection': 0.20,
+        'command-injection': 0.20,
+        'crypto': 0.25,
+        'auth': 0.14,
+        'path-traversal': 0.15,
+        'other': 0.09
     };
 
     public static async analyzeDocument(
@@ -43,8 +45,8 @@ export class OfflineAnalyzer {
                 const issue: SecurityIssue = {
                     type: 'vulnerability',
                     severity: pattern.severity,
-                    message: pattern.name,
-                    description: this.enhanceDescription(pattern, match.text),
+                    message: `${pattern.name}`,
+                    description: this.withContextLine(document, startPos.line, this.enhanceDescription(pattern, match.text)),
                     range: new vscode.Range(startPos, endPos),
                     source: 'Offline Pattern Analysis',
                     suggestion: pattern.suggestion,
@@ -73,8 +75,8 @@ export class OfflineAnalyzer {
                 const issue: SecurityIssue = {
                     type: 'best-practice',
                     severity: pattern.severity,
-                    message: pattern.name,
-                    description: pattern.description,
+                    message: `${pattern.name}`,
+                    description: this.withContextLine(document, startPos.line, pattern.description),
                     range: new vscode.Range(startPos, endPos),
                     source: 'Offline Best Practice Analysis',
                     suggestion: pattern.suggestion,
@@ -86,6 +88,13 @@ export class OfflineAnalyzer {
         }
 
         return this.deduplicateIssues(issues);
+    }
+
+    private static withContextLine(document: vscode.TextDocument, lineIndex: number, baseDescription: string): string {
+        const contextLineIndex = Math.max(0, lineIndex - 1);
+        const contextText = document.lineAt(contextLineIndex).text.trim();
+        const prefix = contextText ? `Line ${contextLineIndex + 1}: ${contextText}\n` : '';
+        return `${prefix}${baseDescription}`;
     }
 
     private static findPatternMatches(text: string, pattern: RegExp): Array<{ index: number; length: number; text: string }> {
@@ -112,56 +121,85 @@ export class OfflineAnalyzer {
     }
 
     private static isInComment(lineText: string, position: number): boolean {
-        // Basic comment detection - can be enhanced
+        // Heuristic comment detection
         const beforePosition = lineText.substring(0, position);
-        
-        // Single line comments
-        if (beforePosition.includes('//') || beforePosition.includes('#')) {
+        const trimmed = beforePosition.trim();
+
+        // Single-line comments: // in JS/TS/C-like, # in Python
+        if (beforePosition.includes('//')) {
             return true;
         }
-        
-        // Multi-line comments (basic detection)
+        if (trimmed.startsWith('#')) {
+            return true;
+        }
+
+        // Multi-line comment start without closing on same line
         if (beforePosition.includes('/*') && !beforePosition.includes('*/')) {
             return true;
         }
-        
+
         return false;
     }
 
     private static calculateConfidence(pattern: VulnerabilityPattern, matchText: string, lineText: string): number {
         let confidence = pattern.confidence;
-        
-        // Boost confidence for certain categories
-        const boost = this.CONFIDENCE_BOOST[pattern.category as keyof typeof this.CONFIDENCE_BOOST] || 0;
-        confidence += boost * 100;
 
-        // Context-based adjustments
+        // Category baseline boost
+        const categoryBoost = this.CONFIDENCE_BOOST[pattern.category as keyof typeof this.CONFIDENCE_BOOST] || 0;
+        confidence += categoryBoost * 100;
+
         const lowerLineText = lineText.toLowerCase();
         const lowerMatchText = matchText.toLowerCase();
 
-        // Increase confidence for suspicious contexts
-        if (lowerLineText.includes('user') || lowerLineText.includes('input') || 
-            lowerLineText.includes('request') || lowerLineText.includes('param')) {
-            confidence += 10;
+        // Input-source context boost
+        const userInputSignals = ['user', 'input', 'request', 'param', 'body', 'query', 'headers', 'form', 'stdin'];
+        if (userInputSignals.some(sig => lowerLineText.includes(sig))) {
+            confidence += 12;
         }
 
-        // Decrease confidence for test files or examples
-        if (lowerLineText.includes('test') || lowerLineText.includes('example') || 
-            lowerLineText.includes('demo') || lowerLineText.includes('mock')) {
-            confidence -= 20;
+        // Sanitization or validation presence reduces confidence slightly
+        const mitigationSignals = ['sanitize', 'escape', 'validate', 'paramet', 'prepared', 'orm', 'safe_load', 'verify', 'dompurify', 'helmet', 'argon2', 'bcrypt', 'pbkdf2', 'scrypt'];
+        if (mitigationSignals.some(sig => lowerLineText.includes(sig))) {
+            confidence -= 18;
         }
 
-        // Specific pattern adjustments
+        // High-risk keywords per category
         if (pattern.category === 'crypto') {
-            if (lowerLineText.includes('password') || lowerLineText.includes('hash')) {
-                confidence += 15;
+            if (/(password|hash|token)/i.test(lineText)) {
+                confidence += 12;
+            }
+            // Additional auth/crypto context signals
+            const authSignals = ['jwt', 'token', 'cookie', 'authorization', 'session', 'localstorage'];
+            if (authSignals.some(sig => lowerLineText.includes(sig))) {
+                confidence += 8;
+            }
+        } else if (pattern.category === 'xss') {
+            if (/(innerhtml|outerhtml|html\(|dangerouslysetinnerhtml)/i.test(lowerMatchText)) {
+                confidence += 8;
+            }
+        } else if (pattern.category === 'command-injection') {
+            if (/(shell\s*=\s*true|exec|spawn|os\.system|subprocess)/i.test(lowerLineText)) {
+                confidence += 10;
+            }
+        } else if (pattern.category === 'sql-injection') {
+            if (/(select|insert|update|delete|where)/i.test(lowerLineText)) {
+                confidence += 10;
+            }
+        } else if (pattern.category === 'path-traversal') {
+            if (/(\.\.|resolve|join|basename)/i.test(lowerLineText)) {
+                confidence += 6;
             }
         }
 
-        if (pattern.category === 'xss') {
-            if (lowerLineText.includes('sanitize') || lowerLineText.includes('escape')) {
-                confidence -= 30; // Already attempting to sanitize
-            }
+        // Dangerous function usage boosts
+        const dangerousExecutionSignals = ['eval(', 'new function', 'settimeout(', 'setinterval('];
+        if (dangerousExecutionSignals.some(sig => lowerLineText.includes(sig))) {
+            confidence += 6;
+        }
+
+        // Likely non-production/test context reduces confidence
+        if (/(test|spec|example|demo|mock)/i.test(lowerLineText)) {
+            confidence -= 20;
         }
 
         return Math.max(10, Math.min(100, confidence));

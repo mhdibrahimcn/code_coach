@@ -63,6 +63,30 @@ export class LanguagePatterns {
             languages: ['javascript', 'typescript'],
             category: 'xss'
         },
+        {
+            id: 'jquery-html-xss',
+            name: 'Potential XSS via jQuery .html()',
+            description: 'Using jQuery .html() can inject unsanitized HTML into the DOM',
+            pattern: /\$\([^)]*\)\.html\s*\(/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 80,
+            cweId: 'CWE-79',
+            suggestion: 'Avoid using .html() with untrusted input. Prefer text() or sanitize input with DOMPurify',
+            languages: ['javascript', 'typescript'],
+            category: 'xss'
+        },
+        {
+            id: 'react-dangerously-set-inner-html',
+            name: 'React dangerouslySetInnerHTML',
+            description: 'dangerouslySetInnerHTML renders raw HTML and can introduce XSS',
+            pattern: /dangerouslySetInnerHTML\s*=\s*\{\s*\{[^}]*\}\s*\}/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 80,
+            cweId: 'CWE-79',
+            suggestion: 'Avoid dangerouslySetInnerHTML or sanitize content before usage (e.g., DOMPurify)',
+            languages: ['javascript', 'typescript'],
+            category: 'xss'
+        },
 
         // SQL Injection patterns
         {
@@ -87,6 +111,18 @@ export class LanguagePatterns {
             cweId: 'CWE-89',
             suggestion: 'Use parameterized queries with ? placeholders or named parameters',
             languages: ['python'],
+            category: 'sql-injection'
+        },
+        {
+            id: 'mongodb-nosql-injection',
+            name: 'NoSQL Injection Risk ($where/regex)',
+            description: 'Untrusted input in MongoDB queries (e.g., $where or dynamic RegExp)',
+            pattern: /\$where\s*:\s*(?:['"`][^'"`]*\+|.*\$\{)|new\s+RegExp\s*\([^)]*\+[^)]*\)/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 80,
+            cweId: 'CWE-943',
+            suggestion: 'Avoid $where. Validate and sanitize inputs; use field queries and parameterization',
+            languages: ['javascript', 'typescript'],
             category: 'sql-injection'
         },
 
@@ -119,13 +155,149 @@ export class LanguagePatterns {
             id: 'insecure-random',
             name: 'Cryptographically Insecure Random',
             description: 'Math.random() is not cryptographically secure',
-            pattern: /Math\.random\s*\(\s*\).*(?:token|password|key|secret|salt|nonce)/gi,
+            pattern: /Math\.random\s*\(\s*\).*?(?:token|password|key|secret|salt|nonce)/gi,
             severity: vscode.DiagnosticSeverity.Error,
             confidence: 85,
             cweId: 'CWE-338',
             suggestion: 'Use crypto.getRandomValues() or crypto.randomBytes() for security-sensitive random values',
             languages: ['javascript', 'typescript'],
             category: 'crypto'
+        },
+        {
+            id: 'legacy-node-cipher',
+            name: 'Legacy/Deprecated Node.js Cipher API',
+            description: 'crypto.createCipher/createDecipher are deprecated and may encourage weak crypto usage',
+            pattern: /crypto\.(?:createCipher|createDecipher)\s*\(/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 85,
+            cweId: 'CWE-327',
+            suggestion: 'Use crypto.createCipheriv/createDecipheriv with modern algorithms (AES-256-GCM) and secure key/IV handling',
+            languages: ['javascript', 'typescript'],
+            category: 'crypto'
+        },
+        {
+            id: 'weak-cipher-ecb',
+            name: 'Insecure Block Cipher Mode (ECB)',
+            description: 'ECB mode is deterministic and leaks patterns in plaintext',
+            pattern: /createCipher(?:iv)?\s*\(\s*['"`](?:[^'"`]*ecb)[^'"`]*['"`]/gi,
+            severity: vscode.DiagnosticSeverity.Error,
+            confidence: 95,
+            cweId: 'CWE-327',
+            suggestion: 'Use an authenticated mode like AES-GCM or at minimum CBC with random IVs; prefer AES-256-GCM',
+            languages: ['javascript', 'typescript'],
+            category: 'crypto'
+        },
+        {
+            id: 'pbkdf2-low-iterations',
+            name: 'PBKDF2 with Low Iteration Count',
+            description: 'PBKDF2 iteration count is below recommended thresholds',
+            pattern: /crypto\.pbkdf2(?:Sync)?\s*\([^,]+,[^,]+,\s*(?:[1-9]\d{0,3})\s*,/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 90,
+            cweId: 'CWE-916',
+            suggestion: 'Increase iterations (>= 10,000; modern guidance often >= 100,000) or use Argon2/bcrypt/scrypt',
+            languages: ['javascript', 'typescript'],
+            category: 'crypto'
+        },
+        {
+            id: 'bcrypt-low-rounds',
+            name: 'bcrypt with Low Cost Factor',
+            description: 'bcrypt cost factor (rounds) is below secure recommendations',
+            pattern: /bcrypt\.hash(?:Sync)?\s*\([^,]+,\s*(?:[1-9])\s*\)/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 88,
+            cweId: 'CWE-916',
+            suggestion: 'Use at least 10-12 rounds for bcrypt; consider 12+ in modern environments',
+            languages: ['javascript', 'typescript'],
+            category: 'crypto'
+        },
+        {
+            id: 'sha-for-passwords',
+            name: 'Raw SHA used for password hashing',
+            description: 'General-purpose hashes like SHA-256 are not suitable for password hashing',
+            pattern: /createHash\s*\(\s*['"`]sha(?:256|512)['"`]\s*\)\s*\.update\s*\([^)]*(?:password|pwd)[^)]*\)/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 92,
+            cweId: 'CWE-916',
+            suggestion: 'Use a password hashing function like Argon2, bcrypt, scrypt, or PBKDF2 with high iteration count',
+            languages: ['javascript', 'typescript'],
+            category: 'crypto'
+        },
+        {
+            id: 'node-ssrf',
+            name: 'Potential SSRF in outbound request',
+            description: 'HTTP client called with variable/unsanitized URL',
+            pattern: /(?:axios\.(?:get|post|put|delete)\s*\(\s*(?!['"`])[^)\n]+|fetch\s*\(\s*(?!['"`])[^)\n]+|https?\.(?:get|request)\s*\(\s*(?!['"`])[^)\n]+)/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 75,
+            cweId: 'CWE-918',
+            suggestion: 'Validate/allowlist URLs and hosts; prevent access to internal metadata endpoints (e.g., 169.254.169.254)',
+            languages: ['javascript', 'typescript'],
+            category: 'other'
+        },
+        // New: Open redirect via Express using untrusted target
+        {
+            id: 'express-open-redirect',
+            name: 'Open Redirect via unvalidated target',
+            description: 'Redirect target derived from user input can cause open redirect',
+            pattern: /res\.redirect\s*\(\s*(req\.(query|body|params)|[a-zA-Z_$][\w$]*\s*\?|\+\s*req\.)/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 80,
+            cweId: 'CWE-601',
+            suggestion: 'Validate redirect targets against an allowlist or use fixed relative paths.',
+            languages: ['javascript', 'typescript'],
+            category: 'other'
+        },
+        // New: Insecure deserialization in Node (serialize-javascript eval, JSON.parse on untrusted with reviver doing eval)
+        {
+            id: 'insecure-deserialization-js',
+            name: 'Insecure Deserialization Pattern',
+            description: 'Deserializing untrusted data in a dangerous way',
+            pattern: /(eval\s*\(\s*JSON\.parse|require\(\s*['"`]serialize-javascript['"`]\s*\)|vm\.(runInNewContext|runInThisContext)\s*\()/gi,
+            severity: vscode.DiagnosticSeverity.Error,
+            confidence: 80,
+            cweId: 'CWE-502',
+            suggestion: 'Avoid eval with parsed JSON; use safe parsers and strict schema validation (e.g., zod/ajv).',
+            languages: ['javascript', 'typescript'],
+            category: 'other'
+        },
+        // New: Path injection in child_process with template/concat
+        {
+            id: 'child-process-injection',
+            name: 'Command Injection in child_process',
+            description: 'Dynamic shell command construction with user-controlled input',
+            pattern: /child_process\.(?:exec|execSync)\s*\(\s*[`'"].*(\$\{|\+).*[)`'"\)]/gi,
+            severity: vscode.DiagnosticSeverity.Error,
+            confidence: 90,
+            cweId: 'CWE-78',
+            suggestion: 'Use execFile/spawn with fixed argv list; validate inputs; avoid shell.',
+            languages: ['javascript', 'typescript'],
+            category: 'command-injection'
+        },
+        // New: Unsanitized HTML in React dangerouslySetInnerHTML from props/state
+        {
+            id: 'react-dangerous-prop',
+            name: 'dangerouslySetInnerHTML from untrusted source',
+            description: 'Rendering HTML from props/state can introduce XSS',
+            pattern: /dangerouslySetInnerHTML\s*=\s*\{\s*\{\s*__html\s*:\s*(this\.props|props|this\.state|state)/gi,
+            severity: vscode.DiagnosticSeverity.Error,
+            confidence: 85,
+            cweId: 'CWE-79',
+            suggestion: 'Sanitize HTML with DOMPurify and validate sources; prefer text rendering.',
+            languages: ['javascript', 'typescript'],
+            category: 'xss'
+        },
+        {
+            id: 'python-ssrf',
+            name: 'Potential SSRF in requests call',
+            description: 'requests.* called with variable/unsanitized URL',
+            pattern: /requests\.(?:get|post|put|delete)\s*\(\s*(?!['"`])[^)\n]+/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 75,
+            cweId: 'CWE-918',
+            suggestion: 'Validate/allowlist URLs and hosts; block internal network access in SSRF-prone contexts',
+            languages: ['python'],
+            category: 'other'
         },
 
         // Command Injection
@@ -142,6 +314,30 @@ export class LanguagePatterns {
             category: 'command-injection'
         },
         {
+            id: 'function-constructor-eval',
+            name: 'Dynamic code execution via Function constructor',
+            description: 'new Function(...) can evaluate arbitrary code and is unsafe with untrusted input',
+            pattern: /new\s+Function\s*\(/gi,
+            severity: vscode.DiagnosticSeverity.Error,
+            confidence: 90,
+            cweId: 'CWE-94',
+            suggestion: 'Avoid dynamic code execution; use safer parsing/logic instead',
+            languages: ['javascript', 'typescript'],
+            category: 'other'
+        },
+        {
+            id: 'settimeout-string-eval',
+            name: 'String argument to setTimeout/setInterval',
+            description: 'Passing a string causes implicit eval and code execution risk',
+            pattern: /set(?:Timeout|Interval)\s*\(\s*['"]/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 85,
+            cweId: 'CWE-94',
+            suggestion: 'Pass a function reference instead of a string: setTimeout(() => fn(), delay)',
+            languages: ['javascript', 'typescript'],
+            category: 'other'
+        },
+        {
             id: 'python-command-injection',
             name: 'Python Command Injection Risk',
             description: 'Executing system commands with user input',
@@ -150,6 +346,18 @@ export class LanguagePatterns {
             confidence: 90,
             cweId: 'CWE-78',
             suggestion: 'Use subprocess with shell=False and list arguments, validate input',
+            languages: ['python'],
+            category: 'command-injection'
+        },
+        {
+            id: 'python-shell-true',
+            name: 'subprocess with shell=True',
+            description: 'Using shell=True executes through a shell and increases injection risk',
+            pattern: /subprocess\.(?:Popen|call|run)\s*\([^)]*shell\s*=\s*True/gi,
+            severity: vscode.DiagnosticSeverity.Error,
+            confidence: 92,
+            cweId: 'CWE-78',
+            suggestion: 'Set shell=False and pass a list of arguments; never pass untrusted input to the shell',
             languages: ['python'],
             category: 'command-injection'
         },
@@ -166,6 +374,66 @@ export class LanguagePatterns {
             suggestion: 'Validate and sanitize file paths, use path.resolve() and check if result is within allowed directory',
             languages: ['javascript', 'typescript', 'python', 'php', 'java', 'csharp'],
             category: 'path-traversal'
+        },
+        {
+            id: 'open-redirect-node',
+            name: 'Open Redirect',
+            description: 'Redirection to a user-controlled URL',
+            pattern: /res\.redirect\s*\(\s*(?!['"`])[^)\n]+\)|window\.location(?:\.href)?\s*=\s*(?!['"`])[^;\n]+/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 80,
+            cweId: 'CWE-601',
+            suggestion: 'Validate redirect targets against an allowlist of domains/paths',
+            languages: ['javascript', 'typescript'],
+            category: 'other'
+        },
+        {
+            id: 'jwt-none-algorithm',
+            name: 'JWT using "none" algorithm',
+            description: 'Using the "none" algorithm disables signature verification and allows token forgery',
+            pattern: /jwt\.(?:sign|verify)\s*\([^)]*algorithm\s*:\s*['"`]none['"`]/gi,
+            severity: vscode.DiagnosticSeverity.Error,
+            confidence: 95,
+            cweId: 'CWE-347',
+            suggestion: 'Use strong algorithms (RS256/ES256) and verify with expected audience/issuer and algorithm allowlist',
+            languages: ['javascript', 'typescript'],
+            category: 'auth'
+        },
+        {
+            id: 'localstorage-sensitive',
+            name: 'Sensitive data in localStorage',
+            description: 'Storing tokens or passwords in localStorage exposes them to XSS theft',
+            pattern: /localStorage\.(?:setItem|getItem)\s*\(\s*['"`](?:token|auth|password|jwt|session)['"`]/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 85,
+            cweId: 'CWE-922',
+            suggestion: 'Avoid storing sensitive data in localStorage; prefer httpOnly, secure cookies with SameSite=Strict',
+            languages: ['javascript', 'typescript'],
+            category: 'auth'
+        },
+        {
+            id: 'insecure-cookie-flags',
+            name: 'Potential insecure cookie flags',
+            description: 'Session/auth cookies should set httpOnly, secure, and SameSite=Strict',
+            pattern: /res\.cookie\s*\(\s*['"`](?:token|session|jwt)['"`][^)]*\)/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 80,
+            cweId: 'CWE-614',
+            suggestion: 'Set secure cookie flags: res.cookie(name, val, { httpOnly: true, secure: true, sameSite: "Strict" })',
+            languages: ['javascript', 'typescript'],
+            category: 'auth'
+        },
+        {
+            id: 'dynamic-regexp',
+            name: 'Dynamic RegExp from variable input',
+            description: 'Creating regular expressions from untrusted input can enable ReDoS or injection-like issues',
+            pattern: /new\s+RegExp\s*\(\s*(?!['"`])/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 75,
+            cweId: 'CWE-400',
+            suggestion: 'Avoid constructing regex from untrusted input or validate/escape input and use timeouts',
+            languages: ['javascript', 'typescript'],
+            category: 'other'
         },
 
         // Hardcoded Secrets (Enhanced)
@@ -192,6 +460,42 @@ export class LanguagePatterns {
             suggestion: 'Store API keys in environment variables or secure configuration',
             languages: ['javascript', 'typescript', 'python', 'php', 'java', 'csharp', 'go', 'rust'],
             category: 'auth'
+        },
+        {
+            id: 'prototype-pollution',
+            name: 'Prototype Pollution Assignment',
+            description: 'Writing to __proto__ or constructor.prototype can lead to prototype pollution',
+            pattern: /(__proto__|constructor\.prototype)\s*=/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 85,
+            cweId: 'CWE-915',
+            suggestion: 'Do not assign to object prototypes based on untrusted input; deep-clone and validate inputs',
+            languages: ['javascript', 'typescript'],
+            category: 'other'
+        },
+        {
+            id: 'jwt-decode-without-verify',
+            name: 'JWT decode without verify',
+            description: 'Using jwt.decode without verifying signature allows forged tokens',
+            pattern: /jwt\.decode\s*\(/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 80,
+            cweId: 'CWE-347',
+            suggestion: 'Use jwt.verify with the expected algorithm and audience/issuer checks',
+            languages: ['javascript', 'typescript'],
+            category: 'auth'
+        },
+        {
+            id: 'python-yaml-unsafe-load',
+            name: 'Unsafe YAML load',
+            description: 'yaml.load without specifying SafeLoader can be unsafe',
+            pattern: /yaml\.load\s*\(/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 80,
+            cweId: 'CWE-502',
+            suggestion: 'Use yaml.safe_load or specify a safe loader',
+            languages: ['python'],
+            category: 'other'
         },
 
         // Language-specific patterns
@@ -263,16 +567,6 @@ export class LanguagePatterns {
             suggestion: 'Add error handling or logging in catch blocks',
             languages: ['javascript', 'typescript', 'java', 'csharp'],
             category: 'error-handling'
-        },
-        {
-            id: 'magic-numbers',
-            name: 'Magic Numbers',
-            description: 'Consider using named constants instead of magic numbers',
-            pattern: /(?<![\w.])\d{3,}(?![\w.])/g,
-            severity: vscode.DiagnosticSeverity.Information,
-            suggestion: 'Replace magic numbers with named constants for better readability',
-            languages: ['javascript', 'typescript', 'python', 'java', 'csharp', 'go', 'rust'],
-            category: 'maintainability'
         },
         {
             id: 'todo-comments',

@@ -608,6 +608,12 @@ function generateComplexityReportHtml(functions: any[]): string {
 function generateIssueDetailsHtml(issue: SecurityIssue): string {
     const config = AIProviderManager.getCurrentConfig();
     const providerInfo = config ? ` (${config.provider.name} ${config.model})` : '';
+
+    // Pull out optional context prefix from description
+    const [firstLine, ...rest] = (issue.description || '').split('\n');
+    const hasContext = /^Line\s+\d+\s*:/.test(firstLine.trim());
+    const contextLine = hasContext ? firstLine : '';
+    const descriptionBody = hasContext ? rest.join('\n') : issue.description;
     
     return `
         <html>
@@ -619,6 +625,8 @@ function generateIssueDetailsHtml(issue: SecurityIssue): string {
                 .error { background-color: #dc3545; }
                 .warning { background-color: #ffc107; color: black; }
                 .info { background-color: #17a2b8; }
+                .ctx { font-family: monospace; background: #f8f9fa; padding: 8px; border-radius: 4px; margin: 8px 0; color: #555; }
+                .meta { color: #6c757d; font-size: 12px; }
             </style>
         </head>
         <body>
@@ -628,10 +636,10 @@ function generateIssueDetailsHtml(issue: SecurityIssue): string {
                     ${issue.severity === 0 ? 'Error' : issue.severity === 1 ? 'Warning' : 'Info'}
                 </span>
             </div>
-            <p><strong>Description:</strong> ${issue.description}</p>
+            ${hasContext ? `<div class="ctx">${escapeHtml(contextLine)}</div>` : ''}
+            <p><strong>Description:</strong> ${escapeHtml(descriptionBody)}</p>
             <p><strong>Suggestion:</strong> ${issue.suggestion}</p>
-            <p><strong>Source:</strong> ${issue.source}${providerInfo}</p>
-            <p><strong>Confidence:</strong> ${issue.confidence}%</p>
+            <p class="meta"><strong>Source:</strong> ${issue.source}${providerInfo} | <strong>Confidence:</strong> ${issue.confidence}% ${issue.cveReference ? `| <strong>Ref:</strong> ${issue.cveReference}` : ''}</p>
         </body>
         </html>
     `;
@@ -643,24 +651,27 @@ function generateAIFixHtml(issue: SecurityIssue, fix: AIFixSuggestion): string {
         <head>
             <style>
                 body { font-family: var(--vscode-font-family); padding: 20px; }
-                .code { background: #f4f4f4; padding: 10px; border-radius: 4px; font-family: monospace; }
+                .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+                .code { background: #f4f4f4; padding: 10px; border-radius: 4px; font-family: monospace; white-space: pre-wrap; }
                 .btn { padding: 10px 20px; background: #007acc; color: white; border: none; border-radius: 4px; cursor: pointer; }
+                .meta { color: #6c757d; font-size: 12px; margin-top: 8px; }
             </style>
         </head>
         <body>
             <h1>🤖 AI Fix Suggestion</h1>
             <p><strong>Issue:</strong> ${issue.message}</p>
             <p><strong>Explanation:</strong> ${fix.explanation}</p>
-            
-            <h3>Original Code:</h3>
-            <div class="code">${escapeHtml(fix.originalCode)}</div>
-            
-            <h3>Fixed Code:</h3>
-            <div class="code">${escapeHtml(fix.fixedCode)}</div>
-            
-            <p><strong>Confidence:</strong> ${fix.confidence}%</p>
-            <p><strong>Risk Level:</strong> ${fix.riskLevel}</p>
-            
+            <div class="grid">
+              <div>
+                <h3>Original</h3>
+                <div class="code">${escapeHtml(fix.originalCode)}</div>
+              </div>
+              <div>
+                <h3>Fixed</h3>
+                <div class="code">${escapeHtml(fix.fixedCode)}</div>
+              </div>
+            </div>
+            <div class="meta"><strong>Confidence:</strong> ${fix.confidence}% | <strong>Risk:</strong> ${fix.riskLevel}</div>
             <button class="btn" onclick="applyFix()">Apply Fix</button>
             
             <script>
@@ -680,7 +691,7 @@ function generateDiffPreviewHtml(issue: SecurityIssue, fix: AIFixSuggestion, doc
         <head>
             <style>
                 body { font-family: var(--vscode-font-family); padding: 20px; }
-                .diff { background: #f4f4f4; padding: 10px; border-radius: 4px; font-family: monospace; }
+                .diff { background: #f4f4f4; padding: 10px; border-radius: 4px; font-family: monospace; white-space: pre-wrap; }
                 .removed { background: #ffdddd; }
                 .added { background: #ddffdd; }
                 .btn { padding: 10px 20px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; }

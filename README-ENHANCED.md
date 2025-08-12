@@ -34,7 +34,7 @@ An advanced VS Code extension that provides AI-powered security analysis, vulner
 ### 📊 Comprehensive Analysis
 - **Best Practice Checks**: console.log, debugger, empty catch blocks
 - **Code Complexity**: Cyclomatic and cognitive complexity analysis
-- **Performance Issues**: Magic numbers, var usage, TODO comments
+- **Performance Issues**: Inefficient patterns, var usage, TODO comments
 - **Multi-language Support**: JavaScript, TypeScript, Python, Java, C#, PHP, Go, Rust, C/C++
 
 ## 🚀 Quick Start
@@ -91,7 +91,7 @@ An advanced VS Code extension that provides AI-powered security analysis, vulner
 
 ### Best Practices
 - **Code Quality**: 20+ patterns across all languages
-- **Performance**: Magic numbers, inefficient patterns
+- **Performance**: Inefficient patterns
 - **Maintainability**: TODO comments, complex functions
 - **Debugging**: console.log, debugger statements
 

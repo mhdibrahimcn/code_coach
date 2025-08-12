@@ -35,73 +35,68 @@ export class HybridAnalyzer {
         let aiAnalysisUsed = false;
 
         try {
-            // Phase 1: Offline Analysis
+            // Phase 1: AI-first Analysis (if enabled and configured)
             let offlineIssues: SecurityIssue[] = [];
-            if (enableOffline) {
-                progressCallback?.('🔍 Running offline pattern analysis...', 
-                    'Scanning code with language-specific vulnerability patterns');
-                
-                offlineIssues = await OfflineAnalyzer.analyzeDocument(document, enableBestPractices);
-                allIssues.push(...offlineIssues);
-                
-                console.log(`Offline analysis found ${offlineIssues.length} issues`);
-            }
+            let aiIssues: SecurityIssue[] = [];
 
-            // Phase 2: Complexity Analysis
-            if (enableComplexity) {
-                progressCallback?.('📊 Analyzing code complexity...', 
-                    'Calculating cyclomatic and cognitive complexity');
-                
-                const complexityIssues = await this.analyzeComplexity(document);
-                allIssues.push(...complexityIssues);
-                
-                console.log(`Complexity analysis found ${complexityIssues.length} issues`);
-            }
-
-            // Phase 3: AI Analysis (if enabled and configured)
             if (enableAI && AIProviderManager.hasValidConfig()) {
-                if (hybridMode) {
-                    // Hybrid mode: Use AI to enhance offline results
-                    progressCallback?.('🧠 AI validation and enhancement...', 
-                        'Using AI to validate findings and discover additional vulnerabilities');
-                    
-                    const aiIssues = await SmartAIAnalyzer.analyzeDocument(
-                        document, 
-                        offlineIssues, 
+                progressCallback?.('🤖 Running AI-powered analysis...', 'Deep AI analysis starting (AI-first)');
+                try {
+                    aiIssues = await SmartAIAnalyzer.analyzeDocument(
+                        document,
+                        [],
                         progressCallback
                     );
-                    
-                    // Merge and deduplicate
-                    const mergedIssues = this.mergeIssues(allIssues, aiIssues);
-                    allIssues = mergedIssues;
-                    analysisType = 'hybrid';
+                    allIssues.push(...aiIssues);
                     aiAnalysisUsed = true;
-                    
-                    console.log(`AI analysis added ${aiIssues.length} additional insights`);
-                } else {
-                    // AI-only mode
-                    progressCallback?.('🤖 Running AI-powered analysis...', 
-                        'Deep AI analysis of code security and vulnerabilities');
-                    
-                    const aiIssues = await SmartAIAnalyzer.analyzeDocument(
-                        document, 
-                        [], 
-                        progressCallback
-                    );
-                    
-                    // Replace offline issues with AI analysis
-                    allIssues = [...allIssues.filter(i => i.type === 'complexity'), ...aiIssues];
-                    analysisType = 'ai-only';
-                    aiAnalysisUsed = true;
+                    analysisType = hybridMode ? 'hybrid' : 'ai-only';
+                    console.log(`AI-first analysis found ${aiIssues.length} issues`);
+                } catch (aiError) {
+                    console.warn('AI analysis failed, will fall back to offline:', aiError);
+                    analysisType = 'offline-only';
                 }
             } else {
-                // Offline-only mode
-                analysisType = 'offline-only';
-                
+                // Prompt user to configure AI provider if AI is enabled but not configured
                 if (enableAI && !AIProviderManager.hasValidConfig()) {
-                    progressCallback?.('⚠️ AI analysis unavailable', 
-                        'Configure AI provider in settings for enhanced analysis');
+                    progressCallback?.('⚠️ AI analysis unavailable', 'Offline basic research will be used');
+                    vscode.window
+                        .showInformationMessage(
+                            'AI analysis is not configured. Configure now for deeper results, or continue in offline mode.',
+                            'Open Settings',
+                            'Continue Offline'
+                        )
+                        .then(selection => {
+                            if (selection === 'Open Settings') {
+                                vscode.commands.executeCommand('codeSecurityAnalyzer.openSettings');
+                            }
+                        });
                 }
+                analysisType = 'offline-only';
+            }
+
+            // Phase 2: Offline Analysis (as supplement or fallback)
+            if (enableOffline) {
+                progressCallback?.('🔍 Running offline basic research...', 'Scanning with language-specific vulnerability patterns');
+                offlineIssues = await OfflineAnalyzer.analyzeDocument(document, enableBestPractices);
+                console.log(`Offline analysis found ${offlineIssues.length} issues`);
+
+                if (aiIssues.length > 0 && hybridMode) {
+                    // Merge offline into AI as supplemental
+                    allIssues = this.mergeIssues(aiIssues, offlineIssues);
+                    analysisType = 'hybrid';
+                } else if (aiIssues.length === 0) {
+                    // AI not used or failed; use offline issues as primary
+                    allIssues.push(...offlineIssues);
+                    analysisType = 'offline-only';
+                }
+            }
+
+            // Phase 3: Complexity Analysis
+            if (enableComplexity) {
+                progressCallback?.('📊 Analyzing code complexity...', 'Calculating cyclomatic and cognitive complexity');
+                const complexityIssues = await this.analyzeComplexity(document);
+                allIssues.push(...complexityIssues);
+                console.log(`Complexity analysis found ${complexityIssues.length} issues`);
             }
 
             // Phase 4: Final processing

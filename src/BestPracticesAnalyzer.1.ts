@@ -21,17 +21,6 @@ export class BestPracticesAnalyzer {
 
 		// General best practices patterns
 		const patterns: BestPracticePattern[] = [
-			// Magic numbers
-			{
-				pattern: /(?<!\w)(?<![\d.])\b(?:0x[\da-f]+|\d{3,}(?:\.\d+)?)\b(?![\d.])/gi,
-				type: 'best-practice' as const,
-				severity: vscode.DiagnosticSeverity.Information,
-				message: 'Magic number detected',
-				description: 'Magic numbers make code harder to understand and maintain. Consider using named constants.',
-				suggestion: 'Replace magic numbers with named constants: const MAX_RETRY_COUNT = 3;',
-				exclude: /console\.log|print|setTimeout|setInterval/
-			},
-
 			// TODO/FIXME comments
 			{
 				pattern: /\/\/\s*(TODO|FIXME|HACK|XXX|BUG)[\s:].*$/gmi,
