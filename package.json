@@ -66,6 +66,16 @@
         "command": "codeSecurityAnalyzer.toggleOfflineMode",
         "title": "📡 Toggle Offline/Online Mode",
         "category": "Code Security Analyzer"
+      },
+      {
+        "command": "codeSecurityAnalyzer.deepSecurityAnalysis",
+        "title": "🔬 Deep Security Analysis",
+        "category": "Code Security Analyzer"
+      },
+      {
+        "command": "codeSecurityAnalyzer.toggleDeepMode",
+        "title": "🔍 Toggle Deep Analysis Mode",
+        "category": "Code Security Analyzer"
       }
     ],
     "configuration": {
@@ -177,6 +187,52 @@
           "type": "boolean",
           "default": false,
           "description": "Enable debug logging for troubleshooting AI provider issues"
+        },
+        "codeSecurityAnalyzer.enableDeepSecurityAnalysis": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable comprehensive function-level security analysis with AI (requires AI provider)"
+        },
+        "codeSecurityAnalyzer.deepAnalysisTimeout": {
+          "type": "number",
+          "default": 60000,
+          "minimum": 30000,
+          "maximum": 300000,
+          "description": "Timeout for deep security analysis in milliseconds"
+        },
+        "codeSecurityAnalyzer.maxFunctionsToAnalyze": {
+          "type": "number",
+          "default": 20,
+          "minimum": 5,
+          "maximum": 100,
+          "description": "Maximum number of functions to analyze in deep mode"
+        },
+        "codeSecurityAnalyzer.enableCWEMapping": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include CWE (Common Weakness Enumeration) references in vulnerability reports"
+        },
+        "codeSecurityAnalyzer.enableOWASPMapping": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include OWASP Top 10 mappings in security vulnerability reports"
+        },
+        "codeSecurityAnalyzer.showFunctionComplexityMetrics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Display function complexity metrics in analysis results"
+        },
+        "codeSecurityAnalyzer.riskLevelThreshold": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "critical"],
+          "default": "medium",
+          "description": "Minimum risk level to display notifications for",
+          "enumDescriptions": [
+            "Show notifications for all security issues",
+            "Show notifications for medium risk and above",
+            "Show notifications for high risk and above", 
+            "Show notifications only for critical security issues"
+          ]
         }
       }
     },
@@ -184,6 +240,11 @@
       "editor/context": [
         {
           "command": "codeSecurityAnalyzer.analyzeActiveFile",
+          "group": "navigation",
+          "when": "editorTextFocus"
+        },
+        {
+          "command": "codeSecurityAnalyzer.deepSecurityAnalysis",
           "group": "navigation",
           "when": "editorTextFocus"
         }
@@ -212,6 +273,12 @@
         },
         {
           "command": "codeSecurityAnalyzer.applyAIFix"
+        },
+        {
+          "command": "codeSecurityAnalyzer.deepSecurityAnalysis"
+        },
+        {
+          "command": "codeSecurityAnalyzer.toggleDeepMode"
         }
       ]
     },

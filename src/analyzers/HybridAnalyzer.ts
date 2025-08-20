@@ -1,16 +1,18 @@
 import * as vscode from 'vscode';
-import { SecurityIssue } from '../SecurityIssue';
+import { SecurityIssue, DeepAnalysisResult } from '../SecurityIssue';
 import { OfflineAnalyzer } from './OfflineAnalyzer';
 import { SmartAIAnalyzer } from './SmartAIAnalyzer';
+import { DeepSecurityAnalyzer } from './DeepSecurityAnalyzer';
 import { ComplexityAnalyzer } from '../ComplexityAnalyzer.1';
 import { AIProviderManager } from '../core/AIProviderManager';
 
 export interface AnalysisResult {
     issues: SecurityIssue[];
-    analysisType: 'offline-only' | 'ai-only' | 'hybrid';
+    analysisType: 'offline-only' | 'ai-only' | 'hybrid' | 'deep';
     executionTime: number;
     aiAnalysisUsed: boolean;
     tokenEstimate?: number;
+    deepAnalysisResult?: DeepAnalysisResult;
 }
 
 export class HybridAnalyzer {
@@ -29,12 +31,40 @@ export class HybridAnalyzer {
         const hybridMode = config.get<boolean>('hybridMode', true);
         const enableBestPractices = config.get<boolean>('enableBestPractices', true);
         const enableComplexity = config.get<boolean>('enableComplexityAnalysis', true);
+        const enableDeepMode = config.get<boolean>('enableDeepSecurityAnalysis', false);
         
         let allIssues: SecurityIssue[] = [];
-        let analysisType: 'offline-only' | 'ai-only' | 'hybrid';
+        let analysisType: 'offline-only' | 'ai-only' | 'hybrid' | 'deep';
         let aiAnalysisUsed = false;
+        let deepAnalysisResult: DeepAnalysisResult | undefined;
 
         try {
+            // Phase 0: Deep Security Analysis (if enabled)
+            if (enableDeepMode && AIProviderManager.hasValidConfig()) {
+                progressCallback?.('🔍 Starting deep security analysis...', 'Function-based vulnerability detection');
+                try {
+                    deepAnalysisResult = await DeepSecurityAnalyzer.analyzeDocument(document, progressCallback);
+                    allIssues.push(...deepAnalysisResult.issues);
+                    aiAnalysisUsed = true;
+                    analysisType = 'deep';
+                    console.log(`Deep analysis found ${deepAnalysisResult.issues.length} issues across ${deepAnalysisResult.functionVulnerabilities.length} functions`);
+                    
+                    // If deep mode is successful, skip other analysis modes
+                    const executionTime = Date.now() - startTime;
+                    return {
+                        issues: deepAnalysisResult.issues,
+                        analysisType: 'deep',
+                        executionTime,
+                        aiAnalysisUsed: true,
+                        deepAnalysisResult,
+                        tokenEstimate: this.estimateTokenUsage(document)
+                    };
+                } catch (deepError) {
+                    console.warn('Deep analysis failed, falling back to standard analysis:', deepError);
+                    progressCallback?.('⚠️ Deep analysis failed, using standard analysis...', 'Continuing with hybrid analysis');
+                }
+            }
+
             // Phase 1: AI-first Analysis (if enabled and configured)
             let offlineIssues: SecurityIssue[] = [];
             let aiIssues: SecurityIssue[] = [];
@@ -114,6 +144,7 @@ export class HybridAnalyzer {
                 analysisType,
                 executionTime,
                 aiAnalysisUsed,
+                deepAnalysisResult,
                 tokenEstimate: aiAnalysisUsed ? this.estimateTokenUsage(document) : undefined
             };
 
@@ -297,11 +328,24 @@ export class HybridAnalyzer {
         }
     }
 
+    public static async analyzeDocumentDeep(
+        document: vscode.TextDocument,
+        progressCallback?: (message: string, tooltip?: string) => void
+    ): Promise<DeepAnalysisResult> {
+        if (!AIProviderManager.hasValidConfig()) {
+            throw new Error('Deep analysis requires AI provider configuration');
+        }
+
+        progressCallback?.('🔍 Starting deep security analysis...', 'Function-based vulnerability detection with comprehensive scanning');
+        return await DeepSecurityAnalyzer.analyzeDocument(document, progressCallback);
+    }
+
     public static getAnalysisCapabilities(): {
         offlinePatterns: number;
         aiProviders: number;
         supportedLanguages: string[];
         hybridModeAvailable: boolean;
+        deepModeAvailable: boolean;
     } {
         const config = vscode.workspace.getConfiguration('codeSecurityAnalyzer');
         const language = vscode.window.activeTextEditor?.document.languageId || 'javascript';
@@ -313,7 +357,8 @@ export class HybridAnalyzer {
             offlinePatterns: capabilities.vulnerabilityPatterns + capabilities.bestPracticePatterns,
             aiProviders: providers.length,
             supportedLanguages: ['javascript', 'typescript', 'python', 'java', 'csharp', 'php', 'go', 'rust', 'cpp', 'c'],
-            hybridModeAvailable: AIProviderManager.hasValidConfig()
+            hybridModeAvailable: AIProviderManager.hasValidConfig(),
+            deepModeAvailable: AIProviderManager.hasValidConfig()
         };
     }
 

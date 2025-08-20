@@ -179,6 +179,52 @@ function registerCommands(context: vscode.ExtensionContext) {
         })
     );
 
+    // Deep Security Analysis command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('codeSecurityAnalyzer.deepSecurityAnalysis', async () => {
+            const activeEditor = vscode.window.activeTextEditor;
+            if (!activeEditor) {
+                vscode.window.showWarningMessage('No active file to analyze');
+                return;
+            }
+
+            if (!isLanguageSupported(activeEditor.document.languageId)) {
+                vscode.window.showWarningMessage(
+                    `Language ${activeEditor.document.languageId} is not supported for deep analysis`
+                );
+                return;
+            }
+
+            if (!AIProviderManager.hasValidConfig()) {
+                vscode.window.showWarningMessage(
+                    'Deep analysis requires AI provider configuration.',
+                    'Open Settings'
+                ).then(selection => {
+                    if (selection === 'Open Settings') {
+                        vscode.commands.executeCommand('codeSecurityAnalyzer.openSettings');
+                    }
+                });
+                return;
+            }
+
+            await performDeepAnalysis(activeEditor.document);
+        })
+    );
+
+    // Toggle Deep Mode command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('codeSecurityAnalyzer.toggleDeepMode', async () => {
+            const config = vscode.workspace.getConfiguration('codeSecurityAnalyzer');
+            const currentMode = config.get<boolean>('enableDeepSecurityAnalysis', false);
+            
+            await config.update('enableDeepSecurityAnalysis', !currentMode, vscode.ConfigurationTarget.Global);
+            
+            const mode = currentMode ? 'disabled' : 'enabled';
+            vscode.window.showInformationMessage(`🔍 Deep Security Analysis ${mode}`);
+            updateStatusBar();
+        })
+    );
+
     // Legacy API key configuration (for backward compatibility)
     context.subscriptions.push(
         vscode.commands.registerCommand('codeSecurityAnalyzer.configureApiKey', async () => {
@@ -431,8 +477,109 @@ function updateStatusBarWithResults(result: any): void {
         icon = vulnerabilities > 3 ? '$(error)' : '$(warning)';
     }
     
-    statusBarItem.text = `${icon} ${vulnerabilities}/${total}`;
-    statusBarItem.tooltip = `Security Analysis Results\n${vulnerabilities} vulnerabilities\n${total} total issues\nAnalysis: ${result.analysisType}\nClick for settings`;
+    // Enhanced status bar for deep analysis
+    if (result.analysisType === 'deep') {
+        icon = '🔬';
+        const riskLevel = result.deepAnalysisResult?.overallRisk || 'low';
+        const riskIcon = riskLevel === 'critical' ? '🚨' : riskLevel === 'high' ? '🔴' : riskLevel === 'medium' ? '🟡' : '🟢';
+        statusBarItem.text = `${icon} ${riskIcon} ${vulnerabilities}/${total}`;
+        statusBarItem.tooltip = `Deep Security Analysis\n${vulnerabilities} vulnerabilities\n${total} total issues\nRisk Level: ${riskLevel}\nFunctions: ${result.deepAnalysisResult?.summary.functionsAnalyzed || 0}\nClick for settings`;
+    } else {
+        statusBarItem.text = `${icon} ${vulnerabilities}/${total}`;
+        statusBarItem.tooltip = `Security Analysis Results\n${vulnerabilities} vulnerabilities\n${total} total issues\nAnalysis: ${result.analysisType}\nClick for settings`;
+    }
+}
+
+async function performDeepAnalysis(document: vscode.TextDocument): Promise<void> {
+    try {
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Deep Security Analysis',
+            cancellable: false
+        }, async (progress) => {
+            const progressCallback = (message: string, tooltip?: string) => {
+                progress.report({ message, increment: undefined });
+                statusBarItem.text = message;
+                statusBarItem.tooltip = tooltip || 'Deep Security Analysis in progress';
+            };
+
+            const startTime = Date.now();
+            console.log(`🔬 Starting deep analysis of ${document.fileName}`);
+
+            // Perform deep analysis
+            const result = await HybridAnalyzer.analyzeDocumentDeep(document, progressCallback);
+            
+            const executionTime = Date.now() - startTime;
+            console.log(`✅ Deep analysis completed in ${executionTime}ms`);
+            console.log(`   Found ${result.issues.length} issues across ${result.functionVulnerabilities.length} functions`);
+            console.log(`   Overall risk: ${result.overallRisk}`);
+
+            // Update diagnostic collection with enhanced information
+            const diagnostics: vscode.Diagnostic[] = result.issues
+                .filter(issue => issue.type !== 'best-practice')
+                .map(issue => {
+                    const diagnostic = new vscode.Diagnostic(
+                        issue.range,
+                        issue.message,
+                        issue.severity
+                    );
+                    diagnostic.source = issue.source;
+                    diagnostic.code = issue.type;
+                    
+                    // Add enhanced metadata for deep analysis
+                    if (issue.isDeepAnalysis) {
+                        diagnostic.tags = [vscode.DiagnosticTag.Unnecessary]; // Use as indicator for enhanced UI
+                    }
+                    
+                    return diagnostic;
+                });
+
+            diagnosticCollection.set(document.uri, diagnostics);
+            codeLensProvider.refresh();
+
+            // Store enhanced analysis context
+            const aiConfig = AIProviderManager.getCurrentConfig();
+            currentAnalysisContext = {
+                document,
+                issues: result.issues,
+                analysisType: 'deep',
+                executionTime,
+                aiProvider: aiConfig ? `${aiConfig.provider.name} (${aiConfig.model})` : undefined
+            };
+
+            // Update status bar with deep analysis results
+            updateStatusBarWithResults({
+                issues: result.issues,
+                analysisType: 'deep',
+                deepAnalysisResult: result
+            });
+
+            // Show comprehensive results
+            const criticalCount = result.summary.criticalCount;
+            const highCount = result.summary.highCount;
+            const totalVulns = result.summary.totalVulnerabilities;
+            const functionsAnalyzed = result.summary.functionsAnalyzed;
+
+            if (totalVulns === 0) {
+                vscode.window.showInformationMessage(
+                    `🛡️ Deep Security Analysis: No vulnerabilities detected across ${functionsAnalyzed} function${functionsAnalyzed === 1 ? '' : 's'}! Your code appears secure.`
+                );
+            } else {
+                const message = criticalCount > 0 ? 'showErrorMessage' : highCount > 0 ? 'showWarningMessage' : 'showInformationMessage';
+                (vscode.window as any)[message](
+                    `🔬 Deep Analysis: Found ${totalVulns} security issue${totalVulns === 1 ? '' : 's'} ` +
+                    `(${criticalCount} critical, ${highCount} high) across ${functionsAnalyzed} function${functionsAnalyzed === 1 ? '' : 's'}. ` +
+                    `Overall risk: ${result.overallRisk.toUpperCase()}. Hover over highlighted lines for details.`
+                );
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Deep analysis failed:', error);
+        statusBarItem.text = '$(error) Deep analysis failed';
+        statusBarItem.tooltip = `Deep analysis failed: ${error}`;
+        vscode.window.showErrorMessage(`Deep security analysis failed: ${error}`);
+    }
 }
 
 function isLanguageSupported(languageId: string): boolean {
