@@ -149,6 +149,16 @@ Return ONLY valid JSON in this exact format (no markdown, no explanations):
 17. Insecure direct object references
 18. Security misconfigurations
 
+**2025 EMERGING THREAT VECTORS (HIGH PRIORITY):**
+19. Supply Chain Attacks - dependency confusion, typosquatting, malicious packages
+20. API Security - GraphQL injection, REST parameter pollution, missing rate limiting
+21. Container Security - privileged containers, image vulnerabilities, secret exposure
+22. AI/ML Security - model injection, prompt injection, training data exposure
+23. Web Cache Poisoning - header manipulation, cache key confusion
+24. Advanced Prototype Pollution - object merge vulnerabilities
+25. Zero-Day Style Memory Safety Issues - buffer overflows, use-after-free patterns
+26. Race Conditions in Web Applications - TOCTOU, shared state issues
+
 **CODE QUALITY, BEST PRACTICES, AND ARCHITECTURE:**
 - Function complexity (cyclomatic, cognitive)
 - Function length and parameter count
@@ -447,17 +457,24 @@ Be thorough but precise. Focus on exploitable vulnerabilities, code complexity i
 	private static getLanguageSpecificFocus(language: string): string {
 		const languageFocus: Record<string, string> = {
 			'javascript': `
-**JavaScript/Node.js Specific Issues:**
-- Prototype pollution attacks
+**JavaScript/Node.js Specific Issues (Updated for 2025):**
+- Prototype pollution attacks (including advanced object merge vectors)
 - Event loop blocking and DoS vulnerabilities
-- NPM package security (malicious dependencies)
+- NPM package security (dependency confusion, typosquatting, postinstall scripts)
 - Client-side template injection
 - Insecure regular expressions (ReDoS)
 - Improper error handling exposing stack traces
 - Insecure cookie settings (httpOnly, secure, sameSite)
 - CSRF vulnerabilities in Express apps
-- JWT implementation flaws
-- Insecure direct eval() or Function() usage`,
+- JWT implementation flaws (including "none" algorithm attacks)
+- Insecure direct eval() or Function() usage
+- Supply chain vulnerabilities in dependencies
+- GraphQL security issues (introspection, depth limiting)
+- Container runtime security (Docker/Kubernetes misconfigurations)
+- AI/ML integration vulnerabilities (prompt injection, model security)
+- Web Cache Poisoning via header manipulation
+- SSRF via URL constructor and fetch APIs
+- Memory leaks from unhandled promises and event listeners`,
 
 			'typescript': `
 **TypeScript Specific Issues:**
@@ -468,7 +485,7 @@ Be thorough but precise. Focus on exploitable vulnerabilities, code complexity i
 - Type pollution in generic functions`,
 
 			'python': `
-**Python Specific Issues:**
+**Python Specific Issues (2025 Updates):**
 - Pickle deserialization vulnerabilities
 - YAML/XML unsafe loading
 - Path traversal with os.path.join
@@ -477,7 +494,14 @@ Be thorough but precise. Focus on exploitable vulnerabilities, code complexity i
 - Template injection in Jinja2/Django
 - Insecure random number generation
 - Django/Flask security misconfigurations
-- Regex DoS (catastrophic backtracking)`,
+- Regex DoS (catastrophic backtracking)
+- AI/ML model injection and training data exposure
+- Jupyter notebook security issues
+- Container escape vulnerabilities
+- Supply chain attacks via PyPI packages
+- FastAPI security misconfigurations
+- Async/await race conditions
+- Memory safety issues in C extensions`,
 
 			'java': `
 **Java Specific Issues:**

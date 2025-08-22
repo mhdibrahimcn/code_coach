@@ -10,7 +10,7 @@ export interface VulnerabilityPattern {
     cweId?: string;
     suggestion: string;
     languages: string[];
-    category: 'xss' | 'sql-injection' | 'command-injection' | 'path-traversal' | 'crypto' | 'auth' | 'other';
+    category: 'xss' | 'sql-injection' | 'command-injection' | 'path-traversal' | 'crypto' | 'auth' | 'supply-chain' | 'api-security' | 'container-security' | 'race-condition' | 'memory-safety' | 'ai-ml-security' | 'other';
 }
 
 export interface BestPracticePattern {
@@ -21,7 +21,7 @@ export interface BestPracticePattern {
     severity: vscode.DiagnosticSeverity;
     suggestion: string;
     languages: string[];
-    category: 'debugging' | 'error-handling' | 'performance' | 'maintainability' | 'other';
+    category: 'debugging' | 'error-handling' | 'performance' | 'maintainability' | 'security' | 'supply-chain' | 'container' | 'ai-ml' | 'other';
 }
 
 export class LanguagePatterns {
@@ -523,6 +523,273 @@ export class LanguagePatterns {
             languages: ['java'],
             category: 'other'
         },
+
+        // 2025 Latest Security Vulnerabilities - Supply Chain Attacks
+        {
+            id: 'npm-dependency-confusion',
+            name: 'Potential Dependency Confusion Attack',
+            description: 'Package name could be vulnerable to dependency confusion attacks',
+            pattern: /require\s*\(\s*['"`](?![@a-z0-9-_.]+\/)[a-z0-9-_.]+['"`]\s*\)|import\s+.*?from\s+['"`](?![@a-z0-9-_.]+\/)[a-z0-9-_.]+['"`]/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 70,
+            cweId: 'CWE-494',
+            suggestion: 'Use scoped packages (@org/package), verify package authenticity, and implement package-lock.json',
+            languages: ['javascript', 'typescript'],
+            category: 'supply-chain'
+        },
+        {
+            id: 'typosquatting-detection',
+            name: 'Potential Typosquatting Package',
+            description: 'Package name resembles popular packages but with slight variations',
+            pattern: /require\s*\(\s*['"`](?:loadsh|expresss|nodemailer|mongose|requestt|axio)['"`]\s*\)/gi,
+            severity: vscode.DiagnosticSeverity.Error,
+            confidence: 95,
+            cweId: 'CWE-494',
+            suggestion: 'Verify package names against official registries; use tools like npm-audit',
+            languages: ['javascript', 'typescript'],
+            category: 'supply-chain'
+        },
+        {
+            id: 'postinstall-script-risk',
+            name: 'Suspicious postinstall script',
+            description: 'Package.json postinstall scripts can execute arbitrary code during installation',
+            pattern: /"postinstall"\s*:\s*['"`](?:curl|wget|bash|sh|powershell|cmd)[^'"` ]*['"`]/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 85,
+            cweId: 'CWE-94',
+            suggestion: 'Review postinstall scripts; consider using --ignore-scripts during npm install',
+            languages: ['javascript', 'typescript'],
+            category: 'supply-chain'
+        },
+
+        // 2025 API Security Vulnerabilities
+        {
+            id: 'graphql-introspection-enabled',
+            name: 'GraphQL Introspection Enabled in Production',
+            description: 'GraphQL introspection can expose sensitive schema information',
+            pattern: /introspection\s*:\s*true|graphqlHTTP\s*\([^)]*introspection\s*:\s*true/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 90,
+            cweId: 'CWE-200',
+            suggestion: 'Disable introspection in production: { introspection: false }',
+            languages: ['javascript', 'typescript'],
+            category: 'api-security'
+        },
+        {
+            id: 'graphql-query-depth-missing',
+            name: 'GraphQL Missing Query Depth Limiting',
+            description: 'GraphQL without depth limiting is vulnerable to DoS attacks',
+            pattern: /(?:buildSchema|makeExecutableSchema|GraphQLSchema)(?![\s\S]*depthLimit|[\s\S]*queryDepth)/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 75,
+            cweId: 'CWE-400',
+            suggestion: 'Implement query depth limiting with libraries like graphql-depth-limit',
+            languages: ['javascript', 'typescript'],
+            category: 'api-security'
+        },
+        {
+            id: 'api-rate-limiting-missing',
+            name: 'Missing API Rate Limiting',
+            description: 'API endpoints without rate limiting are vulnerable to abuse',
+            pattern: /app\.(?:get|post|put|delete|patch)\s*\([^)]*\)\s*,\s*(?!.*rateLimit|.*express-rate-limit)/gi,
+            severity: vscode.DiagnosticSeverity.Information,
+            confidence: 65,
+            cweId: 'CWE-770',
+            suggestion: 'Implement rate limiting with express-rate-limit or similar middleware',
+            languages: ['javascript', 'typescript'],
+            category: 'api-security'
+        },
+        {
+            id: 'rest-api-verb-tampering',
+            name: 'HTTP Method Override Vulnerability',
+            description: 'Method override middleware can bypass security controls',
+            pattern: /methodOverride\s*\(|app\.use\s*\(\s*methodOverride/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 80,
+            cweId: 'CWE-436',
+            suggestion: 'Restrict method override to specific methods and validate origin',
+            languages: ['javascript', 'typescript'],
+            category: 'api-security'
+        },
+
+        // 2025 Container Security Vulnerabilities
+        {
+            id: 'docker-privileged-container',
+            name: 'Privileged Docker Container',
+            description: 'Running containers in privileged mode grants excessive permissions',
+            pattern: /--privileged|privileged\s*:\s*true/gi,
+            severity: vscode.DiagnosticSeverity.Error,
+            confidence: 95,
+            cweId: 'CWE-250',
+            suggestion: 'Remove --privileged flag; use specific capabilities with --cap-add instead',
+            languages: ['dockerfile', 'yaml', 'json'],
+            category: 'container-security'
+        },
+        {
+            id: 'docker-root-user',
+            name: 'Container Running as Root User',
+            description: 'Containers should not run as root user for security',
+            pattern: /USER\s+(?:0|root)\s*$|"user"\s*:\s*['"`](?:0|root)['"`]/gmi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 85,
+            cweId: 'CWE-250',
+            suggestion: 'Create and use a non-root user: USER 1001 or USER appuser',
+            languages: ['dockerfile'],
+            category: 'container-security'
+        },
+        {
+            id: 'kubernetes-hostnetwork',
+            name: 'Kubernetes hostNetwork Enabled',
+            description: 'hostNetwork: true bypasses network policies and exposes host network',
+            pattern: /hostNetwork\s*:\s*true/gi,
+            severity: vscode.DiagnosticSeverity.Error,
+            confidence: 90,
+            cweId: 'CWE-250',
+            suggestion: 'Remove hostNetwork: true; use proper service networking instead',
+            languages: ['yaml'],
+            category: 'container-security'
+        },
+        {
+            id: 'docker-secret-in-env',
+            name: 'Secret in Docker Environment Variable',
+            description: 'Secrets in environment variables are visible in process lists',
+            pattern: /ENV\s+(?:.*(?:PASSWORD|SECRET|TOKEN|KEY|API_KEY).*=|.*=.*(?:password|secret|token|key))/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 80,
+            cweId: 'CWE-200',
+            suggestion: 'Use Docker secrets or Kubernetes secrets instead of environment variables',
+            languages: ['dockerfile'],
+            category: 'container-security'
+        },
+
+        // 2025 Race Condition Vulnerabilities
+        {
+            id: 'file-race-condition',
+            name: 'Time-of-Check Time-of-Use (TOCTOU) Race Condition',
+            description: 'Checking file existence separately from usage creates race condition',
+            pattern: /(?:fs\.existsSync|fs\.access)\s*\([^)]+\)[\s\S]*?(?:fs\.readFileSync|fs\.writeFileSync|fs\.unlinkSync)/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 75,
+            cweId: 'CWE-367',
+            suggestion: 'Use atomic operations or proper file locking; handle errors instead of checking existence',
+            languages: ['javascript', 'typescript'],
+            category: 'race-condition'
+        },
+        {
+            id: 'shared-state-race',
+            name: 'Shared State Race Condition',
+            description: 'Concurrent access to shared variables without synchronization',
+            pattern: /let\s+\w+\s*=\s*0[\s\S]*?\+\+|var\s+\w+\s*=\s*0[\s\S]*?\+\+/gi,
+            severity: vscode.DiagnosticSeverity.Information,
+            confidence: 60,
+            cweId: 'CWE-362',
+            suggestion: 'Use atomic operations, locks, or message passing for shared state',
+            languages: ['javascript', 'typescript'],
+            category: 'race-condition'
+        },
+
+        // 2025 Memory Safety Issues
+        {
+            id: 'buffer-overflow-risk',
+            name: 'Potential Buffer Overflow',
+            description: 'Buffer operations without bounds checking can cause overflow',
+            pattern: /Buffer\.(?:alloc|allocUnsafe)\s*\(\s*(?!\d+\s*\))\w+|Buffer\.from\s*\([^,)]*\w+[^,)]*\)/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 70,
+            cweId: 'CWE-120',
+            suggestion: 'Use Buffer.alloc with fixed sizes; validate input length before Buffer.from',
+            languages: ['javascript', 'typescript'],
+            category: 'memory-safety'
+        },
+        {
+            id: 'memory-leak-listener',
+            name: 'Potential Memory Leak - Event Listener',
+            description: 'Event listeners without cleanup can cause memory leaks',
+            pattern: /\.addEventListener\s*\(|on\s*\(\s*['"`]\w+['"`]\s*,(?![\s\S]*removeEventListener|[\s\S]*off\s*\()/gi,
+            severity: vscode.DiagnosticSeverity.Information,
+            confidence: 65,
+            cweId: 'CWE-401',
+            suggestion: 'Add corresponding removeEventListener or use AbortController for cleanup',
+            languages: ['javascript', 'typescript'],
+            category: 'memory-safety'
+        },
+
+        // 2025 AI/ML Security Vulnerabilities
+        {
+            id: 'model-injection-risk',
+            name: 'AI Model Injection Vulnerability',
+            description: 'Loading models from untrusted sources can execute arbitrary code',
+            pattern: /(?:tensorflow|torch|sklearn)\.(?:load|load_model)\s*\(\s*(?!['"` ])/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 80,
+            cweId: 'CWE-502',
+            suggestion: 'Validate model sources; use model signing and integrity checks',
+            languages: ['python', 'javascript', 'typescript'],
+            category: 'ai-ml-security'
+        },
+        {
+            id: 'prompt-injection',
+            name: 'Potential AI Prompt Injection',
+            description: 'Concatenating user input with prompts can lead to prompt injection',
+            pattern: /(?:openai|anthropic|claude|gpt).*?\+.*?(?:input|user_input|req\.body|request)/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 75,
+            cweId: 'CWE-94',
+            suggestion: 'Sanitize user input; use structured prompts with clear delimiters',
+            languages: ['javascript', 'typescript', 'python'],
+            category: 'ai-ml-security'
+        },
+        {
+            id: 'model-data-exposure',
+            name: 'AI Model Training Data Exposure',
+            description: 'Model outputs may expose sensitive training data',
+            pattern: /(?:model\.predict|model\.generate)(?![\s\S]*sanitize|[\s\S]*filter)/gi,
+            severity: vscode.DiagnosticSeverity.Information,
+            confidence: 60,
+            cweId: 'CWE-200',
+            suggestion: 'Implement output filtering and sanitization for model responses',
+            languages: ['python', 'javascript', 'typescript'],
+            category: 'ai-ml-security'
+        },
+
+        // 2025 Zero-Day Style Patterns
+        {
+            id: 'prototype-pollution-2025',
+            name: 'Advanced Prototype Pollution Vector',
+            description: 'Object merge operations without prototype pollution protection',
+            pattern: /(?:Object\.assign|\.\.\.|lodash\.merge|merge)\s*\([^)]*\w+[^)]*\)(?![\s\S]*hasOwnProperty|[\s\S]*Object\.create\(null\))/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 70,
+            cweId: 'CWE-1321',
+            suggestion: 'Use Map instead of objects or validate keys with hasOwnProperty checks',
+            languages: ['javascript', 'typescript'],
+            category: 'other'
+        },
+        {
+            id: 'web-cache-poisoning',
+            name: 'Web Cache Poisoning Vulnerability',
+            description: 'Unvalidated headers can poison web caches',
+            pattern: /req\.headers\[.*\](?![\s\S]*validate|[\s\S]*sanitize)/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 65,
+            cweId: 'CWE-436',
+            suggestion: 'Validate and sanitize all headers; implement header allowlists',
+            languages: ['javascript', 'typescript'],
+            category: 'other'
+        },
+        {
+            id: 'server-side-request-forgery-2025',
+            name: 'Enhanced SSRF via URL Constructor',
+            description: 'URL constructor with user input can bypass basic SSRF protections',
+            pattern: /new\s+URL\s*\(\s*(?!['"` ])[^,)]*\w+[^,)]*\)/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 75,
+            cweId: 'CWE-918',
+            suggestion: 'Validate URLs against allowlists; check for private IP ranges and metadata endpoints',
+            languages: ['javascript', 'typescript'],
+            category: 'other'
+        },
+
         {
             id: 'csharp-xxe',
             name: 'C# XML External Entity (XXE)',
@@ -597,6 +864,68 @@ export class LanguagePatterns {
             suggestion: 'Use let for mutable variables or const for constants instead of var',
             languages: ['javascript', 'typescript'],
             category: 'maintainability'
+        },
+
+        // 2025 Best Practices
+        {
+            id: 'missing-dependency-pinning',
+            name: 'Unpinned Package Dependencies',
+            description: 'Package.json dependencies should be pinned to specific versions',
+            pattern: /"[^"]+"\s*:\s*"[^\d"]*[~^][^"]*"/gi,
+            severity: vscode.DiagnosticSeverity.Information,
+            suggestion: 'Pin dependencies to exact versions to prevent supply chain attacks',
+            languages: ['json'],
+            category: 'supply-chain'
+        },
+        {
+            id: 'missing-security-headers',
+            name: 'Missing Security Headers Configuration',
+            description: 'Web applications should implement security headers',
+            pattern: /app\.listen|server\.listen(?![\s\S]*helmet|[\s\S]*security-headers)/gi,
+            severity: vscode.DiagnosticSeverity.Information,
+            suggestion: 'Add security headers with helmet.js or equivalent middleware',
+            languages: ['javascript', 'typescript'],
+            category: 'security'
+        },
+        {
+            id: 'dockerfile-best-practices',
+            name: 'Dockerfile Security Best Practices',
+            description: 'Dockerfile should follow security best practices',
+            pattern: /FROM\s+[^:\s]+(?:latest|:[^:\s]*latest)/gi,
+            severity: vscode.DiagnosticSeverity.Information,
+            suggestion: 'Use specific image tags instead of latest for reproducible builds',
+            languages: ['dockerfile'],
+            category: 'container'
+        },
+        {
+            id: 'ai-input-validation',
+            name: 'AI/ML Input Validation Missing',
+            description: 'AI model inputs should be validated and sanitized',
+            pattern: /(?:model\.predict|openai|anthropic)(?![\s\S]*validate|[\s\S]*sanitize)/gi,
+            severity: vscode.DiagnosticSeverity.Information,
+            suggestion: 'Implement input validation and sanitization for AI/ML model inputs',
+            languages: ['python', 'javascript', 'typescript'],
+            category: 'ai-ml'
+        },
+        {
+            id: 'api-versioning-missing',
+            name: 'API Versioning Best Practice',
+            description: 'APIs should implement proper versioning strategy',
+            pattern: /app\.(?:get|post|put|delete)\s*\(\s*['"`]\/(?!v\d+|api\/v\d+)[^'"` ]*['"`]/gi,
+            severity: vscode.DiagnosticSeverity.Information,
+            suggestion: 'Implement API versioning: /api/v1/endpoint or /v1/endpoint',
+            languages: ['javascript', 'typescript'],
+            category: 'maintainability'
+        },
+        {
+            id: 'async-error-handling',
+            name: 'Async Function Missing Error Handling',
+            description: 'Async functions should have proper error handling',
+            pattern: /async\s+(?:function|\w+)\s*\([^)]*\)\s*\{(?![\s\S]*try|[\s\S]*catch|[\s\S]*\.catch)/gi,
+            severity: vscode.DiagnosticSeverity.Information,
+            suggestion: 'Add try-catch blocks or .catch() handlers for async operations',
+            languages: ['javascript', 'typescript'],
+            category: 'error-handling'
         }
     ];
 
