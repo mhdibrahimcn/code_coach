@@ -1,19 +1,66 @@
 import * as vscode from 'vscode';
 import { SecurityIssue, FunctionVulnerability, VulnerabilityDetails, DeepAnalysisResult } from '../SecurityIssue';
 import { AIProviderManager } from '../core/AIProviderManager';
+import { SecurityRuleEngine } from '../rules/SecurityRuleEngine';
+import { logger } from '../core/DebugLogger';
 
 export class DeepSecurityAnalyzer {
     private static readonly FUNCTION_PATTERNS = {
-        javascript: [/function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g, /const\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*\(/g, /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:\s*\(/g],
-        typescript: [/function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g, /const\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*\(/g, /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g],
-        python: [/def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g, /async\s+def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g],
-        java: [/(?:public|private|protected)?\s*(?:static)?\s*[a-zA-Z_<>\[\]]+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g],
-        csharp: [/(?:public|private|protected|internal)?\s*(?:static)?\s*[a-zA-Z_<>\[\]]+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g],
-        php: [/function\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g],
-        go: [/func\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g],
-        rust: [/fn\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g],
-        cpp: [/[a-zA-Z_<>\[\]]+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g],
-        c: [/[a-zA-Z_]+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g]
+        javascript: [
+            /function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g,
+            /const\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s+)?(?:function\s*)?\(/g,
+            /let\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s+)?(?:function\s*)?\(/g,
+            /var\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s+)?(?:function\s*)?\(/g,
+            /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:\s*(?:async\s+)?(?:function\s*)?\(/g,
+            /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s+)?(?:\([^)]*\)\s*=>|\([^)]*\)\s*=>\s*{)/g,
+            /async\s+function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g,
+            /class\s+[a-zA-Z_$][a-zA-Z0-9_$]*\s*{[^}]*([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g
+        ],
+        typescript: [
+            /function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g,
+            /const\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s+)?(?:function\s*)?\(/g,
+            /let\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s+)?(?:function\s*)?\(/g,
+            /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:\s*(?:async\s+)?(?:function\s*)?\(/g,
+            /([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*(?:async\s+)?(?:\([^)]*\)\s*=>|\([^)]*\)\s*=>\s*{)/g,
+            /async\s+function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g,
+            /(?:public|private|protected|readonly)?\s*(?:static\s+)?(?:async\s+)?([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g
+        ],
+        python: [
+            /def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g,
+            /async\s+def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g,
+            /@\w+\s*\n\s*def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g,
+            /class\s+[a-zA-Z_][a-zA-Z0-9_]*\s*(?:\([^)]*\))?\s*:[^{]*def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g
+        ],
+        java: [
+            /(?:public|private|protected|final|static|abstract|synchronized|native|strictfp|\s)+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g,
+            /@\w+\s*\n\s*(?:public|private|protected)?\s*(?:static)?\s*[a-zA-Z_<>\[\]]+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g
+        ],
+        csharp: [
+            /(?:public|private|protected|internal|override|virtual|abstract|static|async|\s)+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g,
+            /\[[\w\s,()]*\]\s*(?:public|private|protected|internal)?\s*(?:static)?\s*[a-zA-Z_<>\[\]]+\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g
+        ],
+        php: [
+            /function\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g,
+            /(?:public|private|protected)?\s*(?:static)?\s*function\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g,
+            /class\s+[a-zA-Z_][a-zA-Z0-9_]*\s*{[^}]*(?:public|private|protected)?\s*(?:static)?\s*function\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g
+        ],
+        go: [
+            /func\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g,
+            /func\s+\([^)]*\)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g
+        ],
+        rust: [
+            /fn\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g,
+            /(?:pub\s+)?(?:async\s+)?(?:unsafe\s+)?fn\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g,
+            /impl\s+[^{]*\s*{\s*(?:pub\s+)?(?:async\s+)?(?:unsafe\s+)?fn\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g
+        ],
+        cpp: [
+            /(?:inline|virtual|static|explicit|constexpr|\s)*[a-zA-Z_<>\[\]~]+\s+(?:[a-zA-Z_:]+::)*([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g,
+            /class\s+[a-zA-Z_][a-zA-Z0-9_]*\s*{[^}]*(?:public|private|protected):\s*[^}]*([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g
+        ],
+        c: [
+            /(?:static|inline|extern|\s)*[a-zA-Z_]+\s*\*?\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g,
+            /typedef\s+[^;]*\(\*([a-zA-Z_][a-zA-Z0-9_]*)\)\s*\(/g
+        ]
     };
 
     public static async analyzeDocument(
@@ -21,64 +68,137 @@ export class DeepSecurityAnalyzer {
         progressCallback?: (message: string) => void
     ): Promise<DeepAnalysisResult> {
         const startTime = Date.now();
+        logger.logAnalysisStart(document, 'Deep Security Analysis');
         progressCallback?.('🔍 Starting deep security analysis...');
 
+        // Phase 1: Rule-based analysis (fast)
+        progressCallback?.('📋 Running rule-based security checks...');
+        const ruleBasedIssues = SecurityRuleEngine.analyzeDocument(document);
+        logger.info(`Rule-based analysis found ${ruleBasedIssues.length} issues`);
+
+        // Phase 2: Function extraction and analysis
         const functions = this.extractFunctions(document);
         progressCallback?.(`📊 Found ${functions.length} functions to analyze...`);
+        logger.info(`Extracted ${functions.length} functions for analysis`, {
+            functions: functions.map(f => ({ name: f.functionName, lines: `${f.startLine}-${f.endLine}` }))
+        });
 
         const functionVulnerabilities: FunctionVulnerability[] = [];
-        const allIssues: SecurityIssue[] = [];
+        const allIssues: SecurityIssue[] = [...ruleBasedIssues];
 
         // Analyze each function independently
-        for (let i = 0; i < functions.length; i++) {
-            const func = functions[i];
-            progressCallback?.(`🔍 Analyzing function ${i + 1}/${functions.length}: ${func.functionName}...`);
+        const config = vscode.workspace.getConfiguration('codeSecurityAnalyzer');
+        const maxFunctions = config.get<number>('maxFunctionsToAnalyze', 20);
+        const functionsToAnalyze = functions.slice(0, maxFunctions);
+        
+        if (functions.length > maxFunctions) {
+            logger.warn(`Limiting analysis to ${maxFunctions} functions (found ${functions.length})`);
+            progressCallback?.(`⚠️ Analyzing first ${maxFunctions} of ${functions.length} functions...`);
+        }
+
+        for (let i = 0; i < functionsToAnalyze.length; i++) {
+            const func = functionsToAnalyze[i];
+            const functionStartTime = Date.now();
+            progressCallback?.(`🔍 Analyzing function ${i + 1}/${functionsToAnalyze.length}: ${func.functionName}...`);
+            
+            logger.debug(`Starting analysis of function: ${func.functionName}`, {
+                lines: `${func.startLine}-${func.endLine}`,
+                codeLength: func.codeChunk.length
+            });
 
             try {
                 const funcVulns = await this.analyzeFunctionSecurity(func, document);
+                const functionDuration = Date.now() - functionStartTime;
+                
+                logger.logFunctionAnalysis(func.functionName, func.startLine, func.endLine, funcVulns.vulnerabilities.length);
+                logger.logPerformanceMetric(`Function ${func.functionName} analysis`, functionDuration);
+                
+                // Always add function analysis (even if no vulnerabilities for tracking)
+                functionVulnerabilities.push(funcVulns);
+                
                 if (funcVulns.vulnerabilities.length > 0) {
-                    functionVulnerabilities.push(funcVulns);
-                    
                     // Convert function vulnerabilities to SecurityIssues
                     const functionIssues = this.convertToSecurityIssues(funcVulns, document);
                     allIssues.push(...functionIssues);
+                    
+                    logger.info(`Function ${func.functionName} has ${funcVulns.vulnerabilities.length} vulnerabilities`, {
+                        risk: funcVulns.securityRisk,
+                        complexity: funcVulns.complexity
+                    });
                 }
                 
-                // Add delay to avoid rate limiting
-                if (i < functions.length - 1) {
-                    await this.delay(300);
+                // Dynamic delay based on function analysis time
+                const delay = Math.min(500, Math.max(200, functionDuration * 0.1));
+                if (i < functionsToAnalyze.length - 1) {
+                    await this.delay(delay);
                 }
             } catch (error) {
-                console.warn(`Failed to analyze function ${func.functionName}:`, error);
+                logger.logError(`Function analysis for ${func.functionName}`, error, {
+                    functionLocation: `${func.startLine}-${func.endLine}`,
+                    codeLength: func.codeChunk.length
+                });
+                
+                // Create a failed analysis result
+                const failedAnalysis: FunctionVulnerability = {
+                    functionName: func.functionName,
+                    startLine: func.startLine,
+                    endLine: func.endLine,
+                    vulnerabilities: [],
+                    complexity: 1,
+                    securityRisk: 'low',
+                    codeChunk: func.codeChunk
+                };
+                functionVulnerabilities.push(failedAnalysis);
             }
         }
 
-        // Perform whole-file analysis for complex vulnerabilities
+        // Phase 3: Perform whole-file analysis for complex vulnerabilities
         progressCallback?.('🔍 Performing comprehensive file analysis...');
-        const globalIssues = await this.performGlobalAnalysis(document);
-        allIssues.push(...globalIssues);
+        try {
+            const globalIssues = await this.performGlobalAnalysis(document);
+            allIssues.push(...globalIssues);
+            logger.info(`Global analysis found ${globalIssues.length} additional issues`);
+        } catch (error) {
+            logger.logError('Global analysis', error);
+            progressCallback?.('⚠️ Global analysis failed, continuing with function results...');
+        }
 
-        // Calculate overall risk assessment
+        // Phase 4: Calculate overall risk assessment
+        progressCallback?.('📊 Calculating risk assessment...');
         const overallRisk = this.calculateOverallRisk(allIssues, functionVulnerabilities);
         const summary = this.generateSummary(allIssues, functionVulnerabilities);
 
         const executionTime = Date.now() - startTime;
+        const deduplicatedIssues = this.deduplicateIssues(allIssues);
+        
+        logger.logAnalysisEnd(document, 'Deep Security Analysis', executionTime, deduplicatedIssues.length);
         progressCallback?.(`✅ Deep analysis completed in ${executionTime}ms`);
 
-        const config = AIProviderManager.getCurrentConfig();
+        const aiConfig = AIProviderManager.getCurrentConfig();
         
-        return {
-            issues: this.deduplicateIssues(allIssues),
+        const result: DeepAnalysisResult = {
+            issues: deduplicatedIssues,
             functionVulnerabilities,
             overallRisk,
             summary,
             analysisMetadata: {
                 analysisType: 'deep',
                 executionTime,
-                aiProvider: config ? `${config.provider.name} (${config.model})` : undefined,
+                aiProvider: aiConfig ? `${aiConfig.provider.name} (${aiConfig.model})` : undefined,
                 timestamp: Date.now()
             }
         };
+
+        logger.info('Deep analysis completed successfully', {
+            totalIssues: result.issues.length,
+            overallRisk: result.overallRisk,
+            functionsAnalyzed: result.functionVulnerabilities.length,
+            ruleBasedIssues: ruleBasedIssues.length,
+            aiAnalyzedFunctions: functionsToAnalyze.length,
+            executionTime
+        });
+
+        return result;
     }
 
     private static extractFunctions(document: vscode.TextDocument): Array<{functionName: string, startLine: number, endLine: number, codeChunk: string}> {
@@ -249,26 +369,36 @@ Provide JSON response with this exact structure:
 }
 
 Focus on these security areas:
-1. Input validation and sanitization
-2. SQL injection vulnerabilities
-3. XSS (Cross-Site Scripting) 
-4. Command injection
-5. Path traversal
-6. Authentication/authorization bypass
-7. Cryptographic weaknesses
-8. Race conditions
-9. Buffer overflows
-10. Deserialization vulnerabilities
-11. SSRF (Server-Side Request Forgery)
-12. XXE (XML External Entity) injection
-13. LDAP injection
-14. NoSQL injection
-15. Prototype pollution (JS/TS)
-16. Memory safety issues
-17. Insecure random number generation
-18. Information disclosure
-19. Privilege escalation
-20. Business logic vulnerabilities
+1. Input validation and sanitization (missing/insufficient validation)
+2. SQL injection vulnerabilities (string concatenation, dynamic queries)
+3. XSS (Cross-Site Scripting) - stored, reflected, and DOM-based
+4. Command injection (system calls with user input)
+5. Path traversal (../../../etc/passwd style attacks)
+6. Authentication/authorization bypass (missing checks, weak tokens)
+7. Cryptographic weaknesses (weak algorithms, hardcoded keys, improper usage)
+8. Race conditions (time-of-check-time-of-use, shared state)
+9. Buffer overflows (unsafe string operations, array bounds)
+10. Deserialization vulnerabilities (unsafe object deserialization)
+11. SSRF (Server-Side Request Forgery) - internal network access
+12. XXE (XML External Entity) injection - external entity processing
+13. LDAP injection (unescaped LDAP queries)
+14. NoSQL injection (MongoDB, CouchDB query injection)
+15. Prototype pollution (JS/TS) - __proto__ manipulation
+16. Memory safety issues (use-after-free, double-free, null dereference)
+17. Insecure random number generation (predictable randomness)
+18. Information disclosure (logging secrets, error messages, debug info)
+19. Privilege escalation (improper permission checks)
+20. Business logic vulnerabilities (workflow bypass, rate limiting)
+21. File upload vulnerabilities (unrestricted file types, path manipulation)
+22. CSRF (Cross-Site Request Forgery) - missing tokens
+23. Session management flaws (insecure cookies, session fixation)
+24. HTTP header injection (CRLF injection)
+25. Template injection (server-side template injection)
+26. Regular expression DoS (ReDoS)
+27. Integer overflow/underflow
+28. Timing attacks (password comparison, cryptographic operations)
+29. Mass assignment vulnerabilities
+30. Insecure direct object references (IDOR)
 
 Code to analyze:
 \`\`\`${language}
@@ -330,16 +460,26 @@ Provide JSON response:
 }
 
 Focus on:
-1. Architecture-level security flaws
-2. Data flow vulnerabilities
-3. Configuration issues
-4. Dependency vulnerabilities  
-5. Security misconfigurations
-6. Cross-function data leakage
-7. Global state vulnerabilities
-8. Import/export security issues
-9. Environment variable exposure
-10. Secret management problems
+1. Architecture-level security flaws (insecure design patterns)
+2. Data flow vulnerabilities (unvalidated data propagation)
+3. Configuration issues (insecure defaults, missing security headers)
+4. Dependency vulnerabilities (outdated packages, known CVEs)
+5. Security misconfigurations (exposed debug endpoints, weak settings)
+6. Cross-function data leakage (shared mutable state, global variables)
+7. Global state vulnerabilities (singleton pattern abuse, static data)
+8. Import/export security issues (unsafe imports, exposed internals)
+9. Environment variable exposure (hardcoded secrets, config leaks)
+10. Secret management problems (plain text storage, weak encryption)
+11. API security issues (missing rate limiting, exposed endpoints)
+12. Error handling flaws (information disclosure in errors)
+13. Logging security issues (sensitive data in logs)
+14. Concurrency issues (thread safety, shared resource access)
+15. Network security problems (unencrypted communications)
+16. File system security (unsafe file operations, permission issues)
+17. Memory management issues (resource leaks, unsafe allocations)
+18. Third-party integration security (unsafe API calls)
+19. Data validation at application boundaries
+20. Security monitoring and alerting gaps
 
 Code:
 \`\`\`${language}

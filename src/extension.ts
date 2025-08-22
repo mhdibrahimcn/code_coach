@@ -8,6 +8,8 @@ import { HybridAnalyzer } from './analyzers/HybridAnalyzer';
 import { AIProviderManager } from './core/AIProviderManager';
 import { SmartAIAnalyzer } from './analyzers/SmartAIAnalyzer';
 import { SettingsWebviewProvider } from './ui/SettingsWebviewProvider';
+import { AnalysisReportWebview } from './ui/AnalysisReportWebview';
+import { logger } from './core/DebugLogger';
 export interface AIFixSuggestion {
     originalCode: string;
     fixedCode: string;
@@ -64,6 +66,7 @@ let analysisTimeout: NodeJS.Timeout | undefined;
 let diagnosticCollection: vscode.DiagnosticCollection;
 let codeLensProvider: SecurityCodeLensProvider;
 let settingsWebviewProvider: SettingsWebviewProvider;
+let analysisReportWebview: AnalysisReportWebview;
 let statusBarItem: vscode.StatusBarItem;
 let currentAnalysisContext: AnalysisContext | null = null;
 
@@ -81,6 +84,9 @@ export function activate(context: vscode.ExtensionContext) {
     
     // Initialize webview provider for settings
     settingsWebviewProvider = new SettingsWebviewProvider(context.extensionUri);
+    
+    // Initialize analysis report webview
+    analysisReportWebview = new AnalysisReportWebview(context.extensionUri);
     
     // Initialize status bar
     statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
@@ -554,7 +560,10 @@ async function performDeepAnalysis(document: vscode.TextDocument): Promise<void>
                 deepAnalysisResult: result
             });
 
-            // Show comprehensive results
+            // Show detailed analysis report in webview
+            await analysisReportWebview.showReport(document, result, executionTime);
+
+            // Show comprehensive results notification
             const criticalCount = result.summary.criticalCount;
             const highCount = result.summary.highCount;
             const totalVulns = result.summary.totalVulnerabilities;
@@ -562,15 +571,25 @@ async function performDeepAnalysis(document: vscode.TextDocument): Promise<void>
 
             if (totalVulns === 0) {
                 vscode.window.showInformationMessage(
-                    `🛡️ Deep Security Analysis: No vulnerabilities detected across ${functionsAnalyzed} function${functionsAnalyzed === 1 ? '' : 's'}! Your code appears secure.`
-                );
+                    `🛡️ Deep Security Analysis: No vulnerabilities detected across ${functionsAnalyzed} function${functionsAnalyzed === 1 ? '' : 's'}! Your code appears secure.`,
+                    'View Report'
+                ).then((selection: string | undefined) => {
+                    if (selection === 'View Report') {
+                        analysisReportWebview.showReport(document, result, executionTime);
+                    }
+                });
             } else {
                 const message = criticalCount > 0 ? 'showErrorMessage' : highCount > 0 ? 'showWarningMessage' : 'showInformationMessage';
                 (vscode.window as any)[message](
                     `🔬 Deep Analysis: Found ${totalVulns} security issue${totalVulns === 1 ? '' : 's'} ` +
                     `(${criticalCount} critical, ${highCount} high) across ${functionsAnalyzed} function${functionsAnalyzed === 1 ? '' : 's'}. ` +
-                    `Overall risk: ${result.overallRisk.toUpperCase()}. Hover over highlighted lines for details.`
-                );
+                    `Overall risk: ${result.overallRisk.toUpperCase()}.`,
+                    'View Report'
+                ).then((selection: string | undefined) => {
+                    if (selection === 'View Report') {
+                        analysisReportWebview.showReport(document, result, executionTime);
+                    }
+                });
             }
         });
 
