@@ -10,6 +10,7 @@ import { SmartAIAnalyzer } from './analyzers/SmartAIAnalyzer';
 import { SettingsWebviewProvider } from './ui/SettingsWebviewProvider';
 import { AnalysisReportWebview } from './ui/AnalysisReportWebview';
 import { logger } from './core/DebugLogger';
+import { ProductKeyManager } from './core/ProductKeyManager';
 export interface AIFixSuggestion {
     originalCode: string;
     fixedCode: string;
@@ -69,9 +70,53 @@ let settingsWebviewProvider: SettingsWebviewProvider;
 let analysisReportWebview: AnalysisReportWebview;
 let statusBarItem: vscode.StatusBarItem;
 let currentAnalysisContext: AnalysisContext | null = null;
+let productKeyManager: ProductKeyManager;
 
-export function activate(context: vscode.ExtensionContext) {
-    console.log('🚀 Code Security Analyzer (Enhanced) is now active!');
+export async function activate(context: vscode.ExtensionContext) {
+    console.log('🚀 Code Security Analyzer (Enhanced) starting...');
+
+    // Initialize product key manager
+    productKeyManager = new ProductKeyManager(context);
+    
+    // Check if the extension is activated with a valid product key
+    const isActivated = await productKeyManager.isActivated();
+    if (!isActivated) {
+        // Show modal dialog that blocks until product key is entered
+        let activationSuccessful = false;
+        
+        while (!activationSuccessful) {
+            const choice = await vscode.window.showErrorMessage(
+                'Code Security Analyzer requires a valid product key to run. Please contact the administrator or check your documentation for the product key.',
+                { modal: true },
+                'Enter Product Key'
+            );
+            
+            if (choice === 'Enter Product Key') {
+                activationSuccessful = await productKeyManager.showActivationDialog();
+                if (!activationSuccessful) {
+                    const retry = await vscode.window.showErrorMessage(
+                        'Invalid product key entered. Please verify your product key and try again.',
+                        { modal: true },
+                        'Try Again',
+                        'Cancel'
+                    );
+                    if (retry !== 'Try Again') {
+                        // User cancelled, block extension activation
+                        vscode.window.showErrorMessage('Code Security Analyzer activation cancelled. Extension disabled.');
+                        return;
+                    }
+                }
+            } else {
+                // User cancelled, block extension activation
+                vscode.window.showErrorMessage('Code Security Analyzer requires activation to run. Extension disabled.');
+                return;
+            }
+        }
+        
+        vscode.window.showInformationMessage('✅ Code Security Analyzer activated successfully!');
+    } else {
+        console.log('✅ Extension already activated with valid product key');
+    }
 
     // Initialize core components
     diagnosticCollection = vscode.languages.createDiagnosticCollection('codeSecurityAnalyzer');
@@ -93,12 +138,12 @@ export function activate(context: vscode.ExtensionContext) {
     statusBarItem.command = 'codeSecurityAnalyzer.openSettings';
     statusBarItem.tooltip = 'Click to open Code Security Analyzer settings';
     context.subscriptions.push(statusBarItem);
-    updateStatusBar();
+    await updateStatusBar();
 
     // Register providers for supported languages
     const supportedLanguages = [
         'javascript', 'typescript', 'python', 'java', 'csharp',
-        'php', 'go', 'rust', 'cpp', 'c'
+        'php', 'go', 'rust', 'cpp', 'c', 'dart'
     ];
 
     for (const language of supportedLanguages) {
@@ -136,6 +181,13 @@ function registerCommands(context: vscode.ExtensionContext) {
     // Main analysis command
     context.subscriptions.push(
         vscode.commands.registerCommand('codeSecurityAnalyzer.analyzeActiveFile', async () => {
+            try {
+                await productKeyManager.requireAuthentication();
+            } catch (error) {
+                vscode.window.showErrorMessage('Authentication required. Please restart the extension to activate.');
+                return;
+            }
+
             const activeEditor = vscode.window.activeTextEditor;
             if (!activeEditor) {
                 vscode.window.showWarningMessage('No active file to analyze');
@@ -163,6 +215,13 @@ function registerCommands(context: vscode.ExtensionContext) {
     // Complexity report command
     context.subscriptions.push(
         vscode.commands.registerCommand('codeSecurityAnalyzer.showComplexityReport', async () => {
+            try {
+                await productKeyManager.requireAuthentication();
+            } catch (error) {
+                vscode.window.showErrorMessage('Authentication required. Please restart the extension to activate.');
+                return;
+            }
+
             const activeEditor = vscode.window.activeTextEditor;
             if (!activeEditor) {
                 vscode.window.showWarningMessage('No active file to analyze');
@@ -188,6 +247,12 @@ function registerCommands(context: vscode.ExtensionContext) {
     // Deep Security Analysis command
     context.subscriptions.push(
         vscode.commands.registerCommand('codeSecurityAnalyzer.deepSecurityAnalysis', async () => {
+            try {
+                await productKeyManager.requireAuthentication();
+            } catch (error) {
+                vscode.window.showErrorMessage('Authentication required. Please restart the extension to activate.');
+                return;
+            }
             const activeEditor = vscode.window.activeTextEditor;
             if (!activeEditor) {
                 vscode.window.showWarningMessage('No active file to analyze');
@@ -315,12 +380,24 @@ function registerCommands(context: vscode.ExtensionContext) {
     // AI fix commands
     context.subscriptions.push(
         vscode.commands.registerCommand('codeSecurityAnalyzer.getAIFix', async (documentUri: string | vscode.Uri, issue: SecurityIssue) => {
+            try {
+                await productKeyManager.requireAuthentication();
+            } catch (error) {
+                vscode.window.showErrorMessage('Authentication required. Please restart the extension to activate.');
+                return;
+            }
             await handleGetAIFix(context, documentUri, issue);
         })
     );
 
     context.subscriptions.push(
         vscode.commands.registerCommand('codeSecurityAnalyzer.applyAIFix', async (documentUri: string | vscode.Uri, issue: SecurityIssue) => {
+            try {
+                await productKeyManager.requireAuthentication();
+            } catch (error) {
+                vscode.window.showErrorMessage('Authentication required. Please restart the extension to activate.');
+                return;
+            }
             await handleApplyAIFix(context, documentUri, issue);
         })
     );
@@ -329,6 +406,18 @@ function registerCommands(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('codeSecurityAnalyzer.showIssueDetails', (issue: SecurityIssue) => {
             showIssueDetailsPanel(issue);
+        })
+    );
+
+    // Product Key Management Commands (Limited functionality)
+    context.subscriptions.push(
+        vscode.commands.registerCommand('codeSecurityAnalyzer.showActivationStatus', async () => {
+            const activationInfo = await productKeyManager.getActivationInfo();
+            if (activationInfo.isActivated) {
+                vscode.window.showInformationMessage(
+                    `Code Security Analyzer is activated and running.\nActivated: ${new Date(activationInfo.activationTimestamp!).toLocaleString()}`
+                );
+            }
         })
     );
 }
@@ -385,6 +474,13 @@ function setupEventListeners(context: vscode.ExtensionContext) {
 
 async function analyzeDocument(document: vscode.TextDocument, forceAnalysis: boolean = false): Promise<void> {
     if (!isLanguageSupported(document.languageId)) {
+        return;
+    }
+
+    // Check authentication for all analysis
+    const isAuthenticated = await productKeyManager.isAuthenticated();
+    if (!isAuthenticated) {
+        console.log('Analysis skipped - extension not authenticated');
         return;
     }
 
@@ -460,17 +556,23 @@ async function analyzeDocument(document: vscode.TextDocument, forceAnalysis: boo
     }
 }
 
-function updateStatusBar(): void {
+async function updateStatusBar(): Promise<void> {
     const config = AIProviderManager.getCurrentConfig();
     
+    let statusText: string;
+    let tooltip: string;
+    
     if (config && config.apiKey) {
-        statusBarItem.text = `$(shield) ${config.provider.name}`;
-        statusBarItem.tooltip = `Code Security Analyzer\nProvider: ${config.provider.name}\nModel: ${config.model}\nClick to open settings`;
+        statusText = `$(shield) ${config.provider.name}`;
+        tooltip = `Code Security Analyzer\nProvider: ${config.provider.name}\nModel: ${config.model}\nClick to open settings`;
     } else {
-        statusBarItem.text = '$(shield) Security (Offline)';
-        statusBarItem.tooltip = 'Code Security Analyzer (Offline mode)\nClick to configure AI provider';
+        statusText = '$(shield) Security (Offline)';
+        tooltip = 'Code Security Analyzer (Offline mode)\nClick to configure AI provider';
     }
     
+    statusBarItem.text = statusText;
+    statusBarItem.tooltip = tooltip;
+    statusBarItem.backgroundColor = undefined;
     statusBarItem.show();
 }
 
@@ -604,7 +706,7 @@ async function performDeepAnalysis(document: vscode.TextDocument): Promise<void>
 function isLanguageSupported(languageId: string): boolean {
     const supportedLanguages = [
         'javascript', 'typescript', 'python', 'java', 'csharp',
-        'php', 'go', 'rust', 'cpp', 'c'
+        'php', 'go', 'rust', 'cpp', 'c', 'dart'
     ];
     return supportedLanguages.includes(languageId);
 }

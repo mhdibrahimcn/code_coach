@@ -1,9 +1,9 @@
 {
   "name": "code-security-analyzer",
   "displayName": "Code Security Analyzer",
-  "description": "Analyzes code for vulnerabilities and errors with inline inspection lenses and hover information",
-  "version": "0.0.1",
-  "publisher": "local-dev",
+  "description": "Analyzes code for vulnerabilities and errors with inline inspection lenses and hover information. For product key inquiries, contact: nfo.althafka@gmail.com | +91 7012296461",
+  "version": "0.0.2",
+  "publisher": "AlthafKA",
   "engines": {
     "vscode": "^1.101.0"
   },
@@ -22,7 +22,8 @@
     "onLanguage:go",
     "onLanguage:rust",
     "onLanguage:cpp",
-    "onLanguage:c"
+    "onLanguage:c",
+    "onLanguage:dart"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -75,6 +76,11 @@
       {
         "command": "codeSecurityAnalyzer.toggleDeepMode",
         "title": "🔍 Toggle Deep Analysis Mode",
+        "category": "Code Security Analyzer"
+      },
+      {
+        "command": "codeSecurityAnalyzer.showActivationStatus",
+        "title": "📊 Show Activation Status",
         "category": "Code Security Analyzer"
       }
     ],
@@ -279,6 +285,9 @@
         },
         {
           "command": "codeSecurityAnalyzer.toggleDeepMode"
+        },
+        {
+          "command": "codeSecurityAnalyzer.showActivationStatus"
         }
       ]
     },

@@ -801,6 +801,128 @@ export class LanguagePatterns {
             suggestion: 'Disable DTD processing or use XmlReaderSettings with DtdProcessing.Prohibit',
             languages: ['csharp'],
             category: 'other'
+        },
+
+        // Dart-specific security vulnerabilities
+        {
+            id: 'dart-eval-injection',
+            name: 'Dart Dynamic Code Execution',
+            description: 'Dynamic code execution using eval or similar mechanisms',
+            pattern: /dart:mirrors|MirrorSystem\.(?:getName|invoke)|eval\s*\(|Function\.apply/gi,
+            severity: vscode.DiagnosticSeverity.Error,
+            confidence: 90,
+            cweId: 'CWE-94',
+            suggestion: 'Avoid dynamic code execution; use safe alternatives or proper validation',
+            languages: ['dart'],
+            category: 'other'
+        },
+        {
+            id: 'dart-file-path-traversal',
+            name: 'Dart Path Traversal Vulnerability',
+            description: 'File operations with unvalidated path input',
+            pattern: /File\s*\(\s*[^)]*\.\.[\\\/]|Directory\s*\(\s*[^)]*\.\.[\\\/]|\.readAsString\(\)|\.writeAsString\(/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 80,
+            cweId: 'CWE-22',
+            suggestion: 'Validate and sanitize file paths; use path.join() and check bounds',
+            languages: ['dart'],
+            category: 'path-traversal'
+        },
+        {
+            id: 'dart-http-injection',
+            name: 'Dart HTTP Injection Risk',
+            description: 'HTTP requests with unvalidated user input',
+            pattern: /http\.(?:get|post|put|delete)\s*\(\s*Uri\.parse\s*\(\s*[^)]*\$|HttpClient\(\)\.(?:get|post).*\$\{/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 85,
+            cweId: 'CWE-918',
+            suggestion: 'Validate URLs and use allowlists; sanitize user input in HTTP requests',
+            languages: ['dart'],
+            category: 'other'
+        },
+        {
+            id: 'dart-sql-injection',
+            name: 'Dart SQL Injection Risk',
+            description: 'SQL query construction using string interpolation',
+            pattern: /(?:query|execute|rawQuery)\s*\(\s*['"` ]*.*\$\{[^}]*\}|(?:query|execute|rawQuery)\s*\(\s*['"` ]*.*\+/gi,
+            severity: vscode.DiagnosticSeverity.Error,
+            confidence: 95,
+            cweId: 'CWE-89',
+            suggestion: 'Use parameterized queries or prepared statements instead of string interpolation',
+            languages: ['dart'],
+            category: 'sql-injection'
+        },
+        {
+            id: 'dart-xss-web',
+            name: 'Dart Web XSS Vulnerability',
+            description: 'DOM manipulation with unsanitized content',
+            pattern: /\.innerHtml\s*=\s*[^"'`\s]|setInnerHtml\s*\(|element\.append.*\$\{/gi,
+            severity: vscode.DiagnosticSeverity.Error,
+            confidence: 85,
+            cweId: 'CWE-79',
+            suggestion: 'Use text content instead of HTML or sanitize with a trusted library',
+            languages: ['dart'],
+            category: 'xss'
+        },
+        {
+            id: 'dart-insecure-random',
+            name: 'Dart Weak Random Number Generation',
+            description: 'Random class is not cryptographically secure',
+            pattern: /Random\s*\(\s*\)\.nextInt|Random\(\)\.nextDouble(?!.*secure)/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 80,
+            cweId: 'CWE-338',
+            suggestion: 'Use Random.secure() for cryptographically secure random numbers',
+            languages: ['dart'],
+            category: 'crypto'
+        },
+        {
+            id: 'dart-hardcoded-secrets',
+            name: 'Dart Hardcoded Secrets',
+            description: 'Hardcoded API keys or passwords in Dart code',
+            pattern: /(?:apiKey|password|secret|token)\s*[:=]\s*['"`][a-zA-Z0-9._-]{8,}['"`]/gi,
+            severity: vscode.DiagnosticSeverity.Error,
+            confidence: 90,
+            cweId: 'CWE-798',
+            suggestion: 'Store secrets in environment variables or secure configuration',
+            languages: ['dart'],
+            category: 'auth'
+        },
+        {
+            id: 'dart-unsafe-cast',
+            name: 'Dart Unsafe Type Cast',
+            description: 'Unsafe casting without null checks can cause runtime errors',
+            pattern: /as\s+(?!String|int|double|bool|List|Map)\w+(?!\?)/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 70,
+            cweId: 'CWE-704',
+            suggestion: 'Use safe casting with is operator or add null checks',
+            languages: ['dart'],
+            category: 'other'
+        },
+        {
+            id: 'dart-flutter-debug-mode',
+            name: 'Flutter Debug Mode in Production',
+            description: 'Debug mode should be disabled in production builds',
+            pattern: /kDebugMode\s*==\s*true|debugPrint\s*\(|assert\s*\(/gi,
+            severity: vscode.DiagnosticSeverity.Information,
+            confidence: 75,
+            cweId: 'CWE-489',
+            suggestion: 'Remove debug code or wrap in kDebugMode checks for production',
+            languages: ['dart'],
+            category: 'other'
+        },
+        {
+            id: 'dart-flutter-webview-security',
+            name: 'Flutter WebView Security Issues',
+            description: 'WebView with JavaScript enabled without security controls',
+            pattern: /WebView\s*\([^)]*javascriptMode\s*:\s*JavascriptMode\.unrestricted/gi,
+            severity: vscode.DiagnosticSeverity.Warning,
+            confidence: 85,
+            cweId: 'CWE-79',
+            suggestion: 'Restrict JavaScript mode and validate URLs; implement content security policy',
+            languages: ['dart'],
+            category: 'xss'
         }
     ];
 
@@ -926,6 +1048,68 @@ export class LanguagePatterns {
             suggestion: 'Add try-catch blocks or .catch() handlers for async operations',
             languages: ['javascript', 'typescript'],
             category: 'error-handling'
+        },
+
+        // Dart-specific best practices
+        {
+            id: 'dart-print-statements',
+            name: 'Dart Print Statements in Production',
+            description: 'Print statements should be removed or replaced with proper logging',
+            pattern: /\bprint\s*\(/gi,
+            severity: vscode.DiagnosticSeverity.Information,
+            suggestion: 'Replace print statements with proper logging or remove for production',
+            languages: ['dart'],
+            category: 'debugging'
+        },
+        {
+            id: 'dart-nullable-types',
+            name: 'Dart Non-Nullable Type Usage',
+            description: 'Consider using nullable types for better null safety',
+            pattern: /\w+\s+\w+(?!\?)\s*;(?!.*\?\s*;)/gi,
+            severity: vscode.DiagnosticSeverity.Information,
+            suggestion: 'Use nullable types (Type?) where appropriate for null safety',
+            languages: ['dart'],
+            category: 'maintainability'
+        },
+        {
+            id: 'dart-magic-numbers',
+            name: 'Dart Magic Numbers',
+            description: 'Avoid magic numbers; use named constants instead',
+            pattern: /(?<![a-zA-Z_])\d{2,}(?![.\d])/gi,
+            severity: vscode.DiagnosticSeverity.Information,
+            suggestion: 'Replace magic numbers with named constants for better maintainability',
+            languages: ['dart'],
+            category: 'maintainability'
+        },
+        {
+            id: 'dart-todo-comments',
+            name: 'Dart TODO Comments',
+            description: 'TODO comments indicate incomplete work',
+            pattern: /\/\/\s*(?:TODO|FIXME|HACK|XXX|BUG)/gi,
+            severity: vscode.DiagnosticSeverity.Information,
+            suggestion: 'Address TODO comments before production deployment',
+            languages: ['dart'],
+            category: 'maintainability'
+        },
+        {
+            id: 'dart-async-error-handling',
+            name: 'Dart Async Function Missing Error Handling',
+            description: 'Async functions should have proper error handling',
+            pattern: /Future<[^>]*>\s+\w+\s*\([^)]*\)\s*async\s*\{(?![\s\S]*try|[\s\S]*catch|[\s\S]*\.catchError)/gi,
+            severity: vscode.DiagnosticSeverity.Information,
+            suggestion: 'Add try-catch blocks or .catchError() handlers for async operations',
+            languages: ['dart'],
+            category: 'error-handling'
+        },
+        {
+            id: 'dart-flutter-dispose',
+            name: 'Flutter Widget Missing Dispose',
+            description: 'StatefulWidget should dispose controllers and streams',
+            pattern: /class\s+\w+\s+extends\s+StatefulWidget[\s\S]*?Controller\s+\w+(?![\s\S]*dispose\(\))/gi,
+            severity: vscode.DiagnosticSeverity.Information,
+            suggestion: 'Implement dispose() method to clean up controllers and prevent memory leaks',
+            languages: ['dart'],
+            category: 'maintainability'
         }
     ];
 
